@@ -29,13 +29,13 @@ const baseOpts = {
   assert(p.resolveId!('virtual:colorfont') === '\0virtual:colorfont', 'resolveId api')
   assert(p.resolveId!('something-else') === undefined, 'resolveId 其它返回 undefined')
 
-  const cssMod = p.load!.call({} as never, '\0virtual:colorfont.css') as string
+  const cssMod = (await p.load!.call({} as never, '\0virtual:colorfont.css')) as string
   assert(cssMod.includes('@font-face'), 'css 模块返回真 CSS(@font-face)')
   assert(cssMod.includes('tech(color-svg)'), 'css 含 tech(color-svg)')
   assert(cssMod.includes('/colorfont/PlugIcons.'), 'build 模式字体 URL 走 /colorfont/')
 
-  const apiMod = p.load!.call({} as never, '\0virtual:colorfont') as string
-  assert(apiMod.includes('export const iconClass'), 'api 模块导出 iconClass')
+  const apiMod = (await p.load!.call({} as never, '\0virtual:colorfont')) as string
+  assert(apiMod.includes('export const icons ='), 'api 模块导出 icons')
   assert(apiMod.includes('export const colorIcons'), 'api 模块导出 colorIcons')
 
   const emitted: { type: string; fileName: string; source: Uint8Array }[] = []
@@ -56,11 +56,11 @@ const baseOpts = {
   await p.buildStart!.call({} as never)
 
   // 从 dev CSS 模块里取一个字体 URL
-  const cssMod = p.load!.call({} as never, '\0virtual:colorfont.css') as string
+  const cssMod = (await p.load!.call({} as never, '\0virtual:colorfont.css')) as string
   assert(cssMod.includes('/@colorfont/'), 'dev 模式字体 URL 走 /@colorfont/')
-  // dev 极速档:dev 跳过 q11 woff2,改产 woff(~84ms)→ dev CSS 引用 .woff
-  const m = cssMod.match(/\/@colorfont\/([^"'?)]+\.woff)(?!2)/)
-  assert(m, '能从 dev CSS 提取一个 woff 字体路径(dev 极速档)')
+  // dev 极速档:dev 用 woff2 q9(格式与生产一致、比 woff 更快),仍引用 .woff2
+  const m = cssMod.match(/\/@colorfont\/([^"'?)]+\.woff2)/)
+  assert(m, '能从 dev CSS 提取一个 woff2 字体路径')
   const fontPath = '/@colorfont/' + m![1]
 
   // mock dev server
@@ -95,14 +95,14 @@ const baseOpts = {
     },
   }
   let nextCalled = false
-  middleware!({ url: fontPath }, res, () => (nextCalled = true))
+  await middleware!({ url: fontPath }, res, () => (nextCalled = true))
   assert(!nextCalled, '字体请求被中间件处理(未 next)')
   assert(res.body && res.body.length > 100, '中间件返回非空字体字节')
-  assert(res.headers['Content-Type'] === 'font/woff', 'Content-Type 为 font/woff(dev 极速档)')
+  assert(res.headers['Content-Type'] === 'font/woff2', 'Content-Type 为 font/woff2')
 
   // 非字体请求应 next
   let passed = false
-  middleware!({ url: '/index.html' }, res, () => (passed = true))
+  await middleware!({ url: '/index.html' }, res, () => (passed = true))
   assert(passed, '非字体请求被放行')
 
   console.log('[dev] served:', fontPath, `(${res.body!.length} B)`, 'ct=' + res.headers['Content-Type'])

@@ -15,7 +15,7 @@ interface VitePluginLike {
   configResolved?(config: { command?: string; base?: string }): void | Promise<void>
   buildStart?(): void | Promise<void>
   resolveId?(id: string): string | undefined
-  load?(this: { emitFile?: (f: unknown) => string }, id: string): string | undefined
+  load?(this: { emitFile?: (f: unknown) => string }, id: string): string | undefined | Promise<string | undefined>
   configureServer?(server: ViteDevServerLike): void
   generateBundle?(this: { emitFile: (f: { type: 'asset'; fileName: string; source: Uint8Array }) => void }): void
 }
@@ -47,15 +47,15 @@ export default function colorfont(options: VitePluginColorfontOptions): VitePlug
   const baseClass = (options.baseSelector ?? '.icon').replace(/^\./, '')
 
   let result: BuildResult | undefined
+  let ready: Promise<void> | undefined // 字体生成的进行中 Promise(dev 后台生成,按需 await)
   let isBuild = false
   let base = '/'
 
   const regenerate = async () => {
-    // dev/serve 极速档:跳过 q11 woff2(每档 ~1.2s),只产 woff(~84ms)→ dev/HMR 近乎瞬时;
-    // 生产 build 仍按用户 formats(默认 woff2)产出最小体积。可用 devFast:false 关闭。
+    // dev/serve 极速档:woff2 用 q9(比 q11 快 ~30×、体积 +6%)→ 格式与生产一致、dev/HMR 近乎瞬时;
+    // 生产 build 用 woff2Quality(默认 11,最高压缩)。可用 devFast:false 关闭。
     if (!isBuild && (options as { devFast?: boolean }).devFast !== false) {
-      const formats = (options.formats ?? ['woff2']).filter((f) => f !== 'woff2')
-      result = await coreBuild({ ...options, formats: formats.length ? formats : ['woff'] })
+      result = await coreBuild({ ...options, woff2Quality: options.woff2Quality ?? 9 })
     } else {
       result = await coreBuild(options)
     }
@@ -72,16 +72,17 @@ export default function colorfont(options: VitePluginColorfontOptions): VitePlug
   const apiModuleSource = () => {
     const g = result!.metadata.glyphs
     const codepoints: Record<string, number> = {}
-    const iconClass: Record<string, string> = {}
+    const icons: Record<string, string> = {} // 图标名 → CSS 类名
+    const colorIcons: Record<string, true> = {} // 对象形式:colorIcons[name] 判定彩色
     for (const x of g) {
       codepoints[x.name] = x.codepoint
-      iconClass[x.name] = classPrefix + x.name
+      icons[x.name] = classPrefix + x.name
+      if (x.color) colorIcons[x.name] = true
     }
-    const colorIcons = g.filter((x) => x.color).map((x) => x.name)
     return (
       `export const codepoints = ${JSON.stringify(codepoints)};\n` +
-      `export const iconClass = ${JSON.stringify(iconClass)};\n` +
-      `export const baseClass = ${JSON.stringify(baseClass)};\n` +
+      `export const icons = ${JSON.stringify(icons)};\n` +
+      `export const baseName = ${JSON.stringify(baseClass)};\n` +
       `export const colorIcons = ${JSON.stringify(colorIcons)};\n` +
       `export function iconContent(name) { return String.fromCodePoint(codepoints[name]); }\n`
     )
@@ -96,7 +97,10 @@ export default function colorfont(options: VitePluginColorfontOptions): VitePlug
     },
 
     async buildStart() {
-      await regenerate()
+      // 启动字体生成。build 必须等(产物要进 bundle);dev 不 await → **不阻塞 vite 冷启动**,
+      // 后台生成,首个 load()/字体请求再按需 await。
+      ready = regenerate()
+      if (isBuild) await ready
     },
 
     resolveId(id) {
@@ -105,8 +109,9 @@ export default function colorfont(options: VitePluginColorfontOptions): VitePlug
       return undefined
     },
 
-    load(id) {
-      if (!result) return undefined
+    async load(id) {
+      if (id !== RESOLVED_CSS && id !== RESOLVED_API) return undefined
+      await ready // dev:后台生成未完成则在此等待(冷启动已先放行)
       if (id === RESOLVED_CSS) return cssModuleSource()
       if (id === RESOLVED_API) return apiModuleSource()
       return undefined
@@ -114,9 +119,10 @@ export default function colorfont(options: VitePluginColorfontOptions): VitePlug
 
     configureServer(server) {
       // 内存供字体(不落盘)
-      server.middlewares.use((req, res, next) => {
+      server.middlewares.use(async (req, res, next) => {
         const url = req.url ?? ''
         if (!url.startsWith(FONT_PREFIX)) return next()
+        await ready // 后台生成未完成则等待
         const name = decodeURIComponent(url.slice(FONT_PREFIX.length).split('?')[0])
         const asset = result?.assets.find((a) => a.fileName === name)
         if (!asset) return next()
@@ -130,7 +136,8 @@ export default function colorfont(options: VitePluginColorfontOptions): VitePlug
       dirs.forEach((d) => server.watcher.add(d))
       const onChange = async (file: string) => {
         if (!file.toLowerCase().endsWith('.svg')) return
-        await regenerate()
+        ready = regenerate()
+        await ready
         for (const id of [RESOLVED_CSS, RESOLVED_API]) {
           const mod = server.moduleGraph.getModuleById(id)
           if (mod) server.moduleGraph.invalidateModule(mod)

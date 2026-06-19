@@ -2,6 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
 import { buildFlavors } from './parallel.ts'
+import { computeCacheKey, readCache, writeCache } from './cache/build-cache.ts'
 import { assignCodepoints, readLockfile, writeLockfile } from './codepoints/lockfile.ts'
 import { emitCss as emitCssImpl } from './emit/emit-css.ts'
 import { emitDts } from './emit/emit-dts.ts'
@@ -65,6 +66,13 @@ export async function build(options: ColorfontOptions): Promise<BuildResult> {
     today(),
   )
 
+  // 构建缓存:输入图标 + 影响产物的选项 + 码位不变 → 命中则跳过整条管线,直接复用上次字体产物
+  const cacheKey = o.cache ? computeCacheKey(icons.map((i) => ({ name: i.name, svg: i.svg })), cpMap, o) : ''
+  if (o.cache) {
+    const hit = readCache(o.cache.dir, cacheKey)
+    if (hit) return { ...hit, emitCss: (resolveUrl) => emitCssImpl(hit.assets, hit.metadata, o, resolveUrl) }
+  }
+
   // useThreads 提前:预处理池与各档构建都用它('auto' 在图标 ≥200 时启用)
   const useThreads = o.threads === true || (o.threads === 'auto' && icons.length >= 200)
 
@@ -116,10 +124,14 @@ export async function build(options: ColorfontOptions): Promise<BuildResult> {
     glyphs: glyphsMeta,
   }
 
+  const dts = emitDts(metadata, o)
+  // 写入构建缓存(失败静默,不影响构建)
+  if (o.cache) writeCache(o.cache.dir, cacheKey, { assets, metadata, dts, codepoints: lock, warnings })
+
   return {
     assets,
     metadata,
-    dts: emitDts(metadata, o),
+    dts,
     codepoints: lock,
     warnings,
     emitCss: (resolveUrl) => emitCssImpl(assets, metadata, o, resolveUrl),

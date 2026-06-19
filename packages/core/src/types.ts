@@ -56,17 +56,23 @@ export interface ColorfontOptions {
   classPrefix?: string
   /** 颜色策略,默认 'auto'。 */
   colorFormat?: ColorFormat
-  /** 输出容器,默认 ['woff2']。显式给出则覆盖 woff 开关。 */
+  /** 输出容器,默认 ['woff2'](所有现代浏览器支持)。如需兼容老浏览器,写 ['woff2','woff']。 */
   formats?: FontFormat[]
-  /** 是否额外产出 .woff(woff2 兼容性已很好,默认 false 只产 woff2)。开启后 CSS 的 src 会带上 woff。 */
-  woff?: boolean
+  /** woff2 的 brotli 压缩质量 1..=11。默认 11(生产最高压缩);dev 自动用 9(快 ~30×,体积仅 +6%)。 */
+  woff2Quality?: number
   /**
    * 是否生成 COLRv0 档(平涂彩色,面向不支持 COLRv1 的老环境)。默认 true。
    * 若只面向现代浏览器(COLRv1 覆盖 Chrome/Edge/FF、OT-SVG 覆盖 Safari),可设 false 省一档。
    */
   colrv0?: boolean
-  /** 多线程:每档字体一个 worker 并行构建(主攻 woff2 编码,占总耗时约 67%)。默认 'auto'(图标 ≥200 时启用)。 */
+  /** 多线程:per-icon 预处理用 worker 池(线程数 = CPU 一半,封顶 8)+ 每档一 worker。默认 'auto'(图标 ≥200 时启用)。 */
   threads?: boolean | 'auto'
+  /**
+   * 构建缓存:图标 + 影响产物的选项 + 码位不变时,跳过整条管线(svgo/svg2ttf/woff2)直接复用上次字体产物,
+   * 加速重启 / HMR / CI。默认开启,缓存在 `node_modules/.cache/colorfont`。
+   * 传 `false` 关闭;传 `{ dir }` 自定义目录(指向仓库内即可随源码提交、团队共享,类似 imagemin)。
+   */
+  cache?: boolean | { dir?: string }
   /** 码位锁文件路径,默认 `<outDir>/codepoints.json`。建议 commit。 */
   codepointsFile?: string
   /** PUA 起始码位,默认 0xE000。 */
@@ -87,7 +93,11 @@ export interface ResolvedOptions {
   formats: FontFormat[]
   /** 是否生成 COLRv0 档。 */
   colrv0: boolean
+  /** woff2 brotli 质量 1..=11。 */
+  woff2Quality: number
   threads: boolean | 'auto'
+  /** 构建缓存目录;false 表示关闭。 */
+  cache: { dir: string } | false
   codepointsFile: string
   paStart: number
 }

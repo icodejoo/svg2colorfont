@@ -29,10 +29,16 @@ export function resolveOptions(o: ColorfontOptions): ResolvedOptions {
     baseSelector: o.baseSelector ?? '.icon',
     classPrefix: o.classPrefix ?? 'icon-',
     colorFormat: o.colorFormat ?? 'auto',
-    // formats 显式给出则用之;否则由 woff 开关推导(woff2 始终产出)
-    formats: o.formats ?? (o.woff ? ['woff2', 'woff'] : ['woff2']),
+    // formats 唯一来源:默认仅 woff2(所有现代浏览器);要 .woff 写 ['woff2','woff']
+    formats: o.formats ?? ['woff2'],
     colrv0: o.colrv0 ?? true,
+    woff2Quality: o.woff2Quality ?? 11,
     threads: o.threads ?? 'auto',
+    // 缓存默认开启,放 node_modules/.cache/colorfont;false 关闭;{ dir } 自定义(可指向仓库内团队共享)
+    cache:
+      o.cache === false
+        ? false
+        : { dir: typeof o.cache === 'object' && o.cache.dir ? resolve(o.cache.dir) : resolve('node_modules/.cache/colorfont') },
     codepointsFile: o.codepointsFile
       ? resolve(o.codepointsFile)
       : resolve(outDir, 'codepoints.json'),

@@ -46,8 +46,8 @@ assert(css.includes('tech(color-colrv0)'), 'CSS 含 tech(color-colrv0)')
 assert(/\.icon-home::before\s*\{\s*content:\s*"\\e002"/.test(css), 'CSS 含 .icon-home::before content')
 
 // dts 多色标记
-assert(result.dts.includes("export const colorIcons = ["), 'dts 含 colorIcons')
-assert(/colorIcons = \[[^\]]*"logo-color"/.test(result.dts), 'colorIcons 含 logo-color')
+assert(result.dts.includes("export const colorIcons = {"), 'dts 含 colorIcons(对象形式)')
+assert(/colorIcons = \{[^}]*"logo-color": true/.test(result.dts), 'colorIcons 含 logo-color: true')
 
 console.log('=== SMOKE: mono + colrv0 + otsvg + tech() CSS ===')
 console.log('glyphs  :', result.metadata.glyphs.map((g) => `${g.name}=U+${g.codepoint.toString(16).toUpperCase()}${g.color ? '*' : ''}`).join(', '))

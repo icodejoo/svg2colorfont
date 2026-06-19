@@ -20,7 +20,7 @@ async function encodeFont(
 ): Promise<FontAsset> {
   let source: Uint8Array
   if (format === 'ttf') source = ttf
-  else if (format === 'woff2') source = await toWoff2(ttf)
+  else if (format === 'woff2') source = await toWoff2(ttf, o.woff2Quality)
   else source = toWoff(ttf)
   const hash = contentHash(source)
   return { fileName: `${o.fontName}.${color}.${hash}.${format}`, source, color, format, hash }

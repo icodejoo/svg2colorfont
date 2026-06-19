@@ -23,8 +23,7 @@
     "svg2ttf": "^6.1.0",
     "svgo": "^4.0.0",
     "svgpath": "^2.6.0",
-    "ttf2woff": "^3.0.0",
-    "woff2-encoder": "^2.0.0"
+    "ttf2woff": "^3.0.0"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

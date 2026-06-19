@@ -47,18 +47,25 @@ export function prepareOne(raw: RawIcon, o: ResolvedOptions): PreparedIcon {
   const { viewBox, paths } = parseSvg(norm)
   const plan = detectColor(paths)
   const base = toOutline(plan.allDs, viewBox, o)
-  const layers: OutlinedLayer[] = plan.layers.map((l: ColorLayer) => {
-    const out = toOutline([l.d], viewBox, o)
-    return { d: out.d, advanceWidth: out.advanceWidth, bbox: out.bbox, fill: l.fill, color: l.color }
-  })
+
+  // 单色快路径:colorFormat:'mono' 只产 mono 档,只需 base 轮廓 →
+  // 跳过每层 toOutline(图标多层时省一大笔)+ 跳过 OT-SVG 用的 inner。
+  const monoOnly = o.colorFormat === 'mono'
+  const layers: OutlinedLayer[] = monoOnly
+    ? []
+    : plan.layers.map((l: ColorLayer) => {
+        const out = toOutline([l.d], viewBox, o)
+        return { d: out.d, advanceWidth: out.advanceWidth, bbox: out.bbox, fill: l.fill, color: l.color }
+      })
+
   return {
     name: raw.name,
     codepoint: raw.codepoint,
     viewBox,
     base: { d: base.d, advanceWidth: base.advanceWidth, bbox: base.bbox },
     layers,
-    inner: getSvgInner(norm),
-    multicolor: plan.multicolor,
-    needsColor: plan.multicolor || plan.hasGradient,
+    inner: monoOnly ? '' : getSvgInner(norm),
+    multicolor: monoOnly ? false : plan.multicolor,
+    needsColor: monoOnly ? false : plan.multicolor || plan.hasGradient,
   }
 }
