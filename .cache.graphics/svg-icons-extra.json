@@ -1,0 +1,11 @@
+{
+  "configHash": "e2dc73bce146462635de1e2b28eaf0a334e5d647ab435c551591e885e577a471",
+  "files": {
+    "packages/exports/test/.acc-unused/icons/a.svg": "5244ce0f922fa1bd5bcb0decf0f72765bc355dd07bd1ee8d889b978dfde87f62"
+  },
+  "outputs": [
+    "packages/exports/test/.acc-svg/extra.svg",
+    "packages/exports/test/.acc-svg/extra.ts"
+  ],
+  "hash": "5bdf3a00fb6faaf4e50a06fda02bdef72ab812a9dd0eb6ff1d40f51c6a85fc78"
+}

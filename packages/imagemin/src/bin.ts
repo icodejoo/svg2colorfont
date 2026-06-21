@@ -16,7 +16,7 @@ import { globSync } from "node:fs"
 import { relative, resolve } from "node:path"
 import { pathToFileURL } from "node:url"
 
-import { matchesAnyGlob, optimizeImages, toGlobList } from "./imagemin.ts"
+import { imagemin, matchesAnyGlob, toGlobList } from "./imagemin.ts"
 import { defaultOptions } from "./options.ts"
 
 import type { ImageminOptions } from "./imagemin.ts"
@@ -25,7 +25,7 @@ import type { ImageminOptions } from "./imagemin.ts"
  * 全量扫描：用 include glob 在 roots 下匹配图片，按 exclude glob 排除。返回去重后的绝对路径。
  * 完全由 options.include / options.exclude 驱动（单一事实来源，支持数组）。
  *
- * 排除一律以「仓库根（process.cwd()）相对路径」匹配 —— 与暂存模式、optimizeImages 语义一致：
+ * 排除一律以「仓库根（process.cwd()）相对路径」匹配 —— 与暂存模式、imagemin 语义一致：
  * 无论从哪个子目录扫，`**​/dist/**` 这类规则都生效。
  */
 function walkImages(roots: string[], options: ImageminOptions): string[] {
@@ -102,7 +102,7 @@ export async function runCli(argv: string[] = process.argv.slice(2)): Promise<vo
     }
   }
 
-  const { changed } = await optimizeImages(files, options)
+  const { changed } = await imagemin(files, options)
   console.log(`[imagemin] ${fullScan ? "全量" : "处理"}完成：改写 ${changed.length} 张（缓存已更新）`)
 }
 

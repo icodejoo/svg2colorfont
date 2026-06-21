@@ -21,19 +21,19 @@ description: >-
 
 ## 用法
 
-### CLI（本包 bin: `codejoo-imagemin`；经发布包 `graphics-icon` 暴露为 `g-min`）
-CLI 逻辑在 `src/bin.ts`,导出 **`runCli(argv)`**（经 index 再导出），发布包 bin `g-min` 即薄包装它——
+### CLI（本包 bin: `codejoo-imagemin`；经发布包 `graphics-icon` 暴露为 `image-min`）
+CLI 逻辑在 `src/bin.ts`,导出 **`runCli(argv)`**（经 index 再导出），发布包 bin `image-min` 即薄包装它——
 其它三引擎(colorfont/bitmap/svg)的 CLI 也照此模式由发布包统一暴露,四者能力对齐。
-- 指定文件（如 pre-commit 暂存图）：`g-min a.png b.svg`
-- 全量扫描：`g-min --all [目录...]`（缺省扫描 `process.cwd()`）；`--scan` 同义。
-- 自定义配置：`g-min --all --config ./imagemin.config.ts`（动态 import 后浅合并到 `defaultOptions` 之上，用户优先）。
+- 指定文件（如 pre-commit 暂存图）：`image-min a.png b.svg`
+- 全量扫描：`image-min --all [目录...]`（缺省扫描 `process.cwd()`）；`--scan` 同义。
+- 自定义配置：`image-min --all --config ./imagemin.config.ts`（动态 import 后浅合并到 `defaultOptions` 之上，用户优先）。
 - 只「压缩 + 更新缓存」，不碰 git。
 
 ### 编程式
 ```ts
-import { optimizeImages, defaultOptions } from "graphics-icon/imagemin"
+import { imagemin, defaultOptions } from "graphics-icon/imagemin"
 
-const { changed, results, cacheFile } = await optimizeImages(
+const { changed, results, cacheFile } = await imagemin(
   ["src/assets/logo.png", "src/icons/a.svg"],
   { ...defaultOptions, concurrency: 4 },
 )

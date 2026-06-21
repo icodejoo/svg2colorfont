@@ -8,7 +8,7 @@
  *   · bitmapIcons  —— 位图雪碧图(bitmap-icons 插件工厂)。
  *   · imagemin     —— 构建产物图片压缩(closeBundle)。
  *
- * 多实例:colorfont/svgIcons/bitmapIcons 均为 `{ ...公共, items:[...] }`(每项与公共合并)。
+ * 多实例:colorfonts/svgIcons/bitmapIcons 均为 `{ ...公共, items:[...] }`(每项与公共合并)。
  * 缓存:各引擎自持(groupCache);vite 模式每实例用 `cacheName`(仅文件名,落 .cache.graphics/),伞层映射为引擎的 `cacheFilename`。
  * 错误:各实例 `throwable`(默认 true)→ 失败抛错(vite 报错);false → 告警继续。
  *
@@ -18,15 +18,17 @@
 import { isAbsolute, relative, resolve } from 'node:path'
 import { promises as fs } from 'node:fs'
 
-import { svgIcons as svgIconsPlugin } from 'svg-icons'
-import { bitmapIcons as bitmapIconsPlugin } from 'bitmap-icons'
-import { generateColorfonts } from '@codejoo/colorfont'
+import { svgIconsVite } from 'svg-icons'
+import { bitmapIconsVite } from 'bitmap-icons'
+import { colorfonts } from '@codejoo/colorfont'
+import { unusedVite } from '@codejoo/unused'
 import * as imageminEngine from '@codejoo/imagemin'
 
 import type { Plugin } from 'vite'
 import type { ColorfontCommon, ColorfontItem, ColorfontOptions } from '@codejoo/colorfont'
 import type { SvgIconsCommon, SvgIconsItem } from 'svg-icons'
 import type { BitmapIconsCommon, BitmapIconsItem } from 'bitmap-icons'
+import type { UnusedDetectOptions } from '@codejoo/unused'
 
 // ── vite 选项:每实例用 cacheName(仅文件名),不暴露独立模式的 cacheFilename ──
 /** 把实例的 `cacheFilename` 替换为 `cacheName`(vite 模式只给名字,目录由系统管理)。 */
@@ -61,10 +63,38 @@ export type ImageminPluginOptions = Partial<imageminEngine.ImageminOptions> & {
  * 伞插件统一选项。每个子键:传对象 → 启用;传 `false`/省略 → 跳过。
  */
 export interface GraphicsIconOptions {
-  colorfont?: ColorfontPluginOptions | false
+  colorfonts?: ColorfontPluginOptions | false
   svgIcons?: SvgIconsPluginOptions | false
   bitmapIcons?: BitmapIconsPluginOptions | false
   imagemin?: ImageminPluginOptions | false
+  /**
+   * 未使用资产检测:build 期经模块图 diff 写出清单表(.cache.graphics/unused.json),供 `removeUnused`/
+   * `remove-unused` 删除。四引擎(colorfonts/svgIcons/bitmapIcons)的输入目录与产物会自动并入排除。
+   * `exclude` 为额外排除项(在自动排除之上追加)。
+   */
+  unused?: UnusedDetectOptions | false
+}
+
+/**
+ * 收集四引擎的「输入目录(/**) + 产物路径」作为 unused 检测的排除项 —— 引擎消费资产但不被源码 import,
+ * 不排除会被误判为未使用而误删。仅取各实例 items 上可靠存在的 input/output 字段。
+ */
+function engineExcludes(options: GraphicsIconOptions): string[] {
+  const out: string[] = []
+  // 归一为「仓库根(cwd)相对、正斜杠」——与 unusedVite 候选路径的匹配口径一致(绝对/相对配置皆可)。
+  const rel = (p: string): string => relative(process.cwd(), resolve(p)).replace(/\\/g, '/')
+  const dirGlob = (p: string): string => `${rel(p).replace(/\/+$/, '')}/**`
+  const pushDir = (input: string | string[] | undefined): void => {
+    for (const d of Array.isArray(input) ? input : input ? [input] : []) out.push(dirGlob(d))
+  }
+  const pushFile = (p: string | undefined): void => {
+    if (p) out.push(rel(p))
+  }
+
+  if (options.colorfonts) for (const it of options.colorfonts.items ?? []) { pushDir(it.input); if (it.outDir) out.push(dirGlob(it.outDir)) }
+  if (options.svgIcons) for (const it of options.svgIcons.items ?? []) { pushDir(it.input); pushFile(it.output?.svg); pushFile(it.output?.script) }
+  if (options.bitmapIcons) for (const it of options.bitmapIcons.items ?? []) { pushDir(it.inputDir); pushFile(it.output?.image); pushFile(it.output?.style); pushFile(it.output?.script); pushFile(it.output?.json) }
+  return out
 }
 
 /** 把 vite 实例数组的 `cacheName` 映射为引擎的 `cacheFilename`(resolveCacheFile 按裸名落共享目录)。 */
@@ -85,7 +115,7 @@ function underAny(file: string, dirs: string[]): boolean {
 }
 
 // ── colorfont 子插件(实物落盘,无虚拟模块/中间件) ──
-function colorfontPlugin(opts: ColorfontPluginOptions): Plugin {
+function colorfontsVite(opts: ColorfontPluginOptions): Plugin {
   const { watch, devFast, items, ...common } = opts
   const baseItems = mapItems(items) as ColorfontItem[]
   const inputDirs = items.flatMap((it) => (Array.isArray(it.input) ? it.input : [it.input])).map((d) => resolve(d))
@@ -95,7 +125,7 @@ function colorfontPlugin(opts: ColorfontPluginOptions): Plugin {
     // dev 极速档:未显式设 woff2Quality 时用 q9;build 用默认(11)。
     const o: ColorfontOptions =
       !isBuild && devFast !== false ? { ...common, woff2Quality: common.woff2Quality ?? 9, items: baseItems } : { ...common, items: baseItems }
-    await generateColorfonts(o)
+    await colorfonts(o)
   }
   const affects = (file: string): boolean => file.toLowerCase().endsWith('.svg') && underAny(file, inputDirs)
 
@@ -135,7 +165,7 @@ async function listImages(dir: string): Promise<string[]> {
   return out
 }
 
-export function imageminPlugin(opts?: ImageminPluginOptions): Plugin {
+export function imageminVite(opts?: ImageminPluginOptions): Plugin {
   let outDir = 'dist'
   return {
     name: 'graphics-icon:imagemin',
@@ -149,14 +179,14 @@ export function imageminPlugin(opts?: ImageminPluginOptions): Plugin {
       const files = await listImages(root)
       if (files.length === 0) return
       const merged: imageminEngine.ImageminOptions = { ...imageminEngine.defaultOptions, ...opts }
-      await imageminEngine.optimizeImages(files, merged)
+      await imageminEngine.imagemin(files, merged)
     },
   } as Plugin
 }
 
 // ── 单插件合并:把各启用子插件的同名钩子多路复用到「一个」Vite Plugin 上 ──
 type AnyHook = (this: unknown, ...args: unknown[]) => unknown
-const FANOUT_HOOKS = ['config', 'configResolved', 'configureServer', 'buildStart', 'buildEnd', 'generateBundle', 'closeBundle', 'watchChange', 'handleHotUpdate'] as const
+const FANOUT_HOOKS = ['config', 'configResolved', 'configureServer', 'buildStart', 'load', 'buildEnd', 'generateBundle', 'closeBundle', 'watchChange', 'handleHotUpdate'] as const
 
 function mergePlugins(name: string, subs: Plugin[]): Plugin {
   const merged: Record<string, unknown> = { name }
@@ -177,10 +207,15 @@ function mergePlugins(name: string, subs: Plugin[]): Plugin {
  */
 export default function graphicsIcon(options: GraphicsIconOptions = {}): Plugin {
   const subs: Plugin[] = []
-  if (options.svgIcons) subs.push(svgIconsPlugin({ ...options.svgIcons, items: mapItems(options.svgIcons.items) as SvgIconsItem[] }))
-  if (options.bitmapIcons) subs.push(bitmapIconsPlugin({ ...options.bitmapIcons, items: mapItems(options.bitmapIcons.items) as BitmapIconsItem[] }))
-  if (options.colorfont) subs.push(colorfontPlugin(options.colorfont))
-  if (options.imagemin) subs.push(imageminPlugin(options.imagemin))
+  if (options.svgIcons) subs.push(svgIconsVite({ ...options.svgIcons, items: mapItems(options.svgIcons.items) as SvgIconsItem[] }))
+  if (options.bitmapIcons) subs.push(bitmapIconsVite({ ...options.bitmapIcons, items: mapItems(options.bitmapIcons.items) as BitmapIconsItem[] }))
+  if (options.colorfonts) subs.push(colorfontsVite(options.colorfonts))
+  if (options.imagemin) subs.push(imageminVite(options.imagemin))
+  // unused 必须最后:其 load 钩子需观察前面引擎/应用引入的全部模块;排除自动并入四引擎输入/产物。
+  if (options.unused) {
+    const auto = engineExcludes(options)
+    subs.push(unusedVite({ ...options.unused, exclude: [...auto, ...(options.unused.exclude ?? [])] }))
+  }
   return mergePlugins('graphics-icon', subs)
 }
 
@@ -188,3 +223,4 @@ export default function graphicsIcon(options: GraphicsIconOptions = {}): Plugin 
 export type { ColorfontItem, ColorfontCommon } from '@codejoo/colorfont'
 export type { SvgIconsItem, SvgIconsCommon } from 'svg-icons'
 export type { BitmapIconsItem, BitmapIconsCommon } from 'bitmap-icons'
+export type { UnusedDetectOptions } from '@codejoo/unused'

@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readdirSync, rmSync } from "node:fs"
 import { dirname, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
-import { generateColorfonts } from "./src/index.ts"
+import { colorfonts } from "./src/index.ts"
 
 const here = dirname(fileURLToPath(import.meta.url))
 const fixtures = resolve(here, "fixtures") // 源图标(只读)
@@ -48,7 +48,7 @@ const opts = (cache = true) => ({
   ],
 })
 
-await capture(() => generateColorfonts(opts()))
+await capture(() => colorfonts(opts()))
 check(
   readdirSync("out/a").some((f) => f.endsWith(".woff2")),
   "A: woff2 font written",
@@ -58,17 +58,17 @@ check(existsSync("out/a/AIcons.codepoints.json"), "A: codepoints lock written")
 check(existsSync("out/b/BIcons.css") && readdirSync("out/b").some((f) => f.endsWith(".woff2")), "B (mono): products written")
 check(hitCount() === 0, "1st run = miss (both)")
 
-await capture(() => generateColorfonts(opts()))
+await capture(() => colorfonts(opts()))
 check(hitCount() === 2, "2nd run unchanged = HIT (both instances)")
 
 // 删 A 的产物 → A miss、B 仍 hit
 rmSync("out/a/AIcons.css")
-await capture(() => generateColorfonts(opts()))
+await capture(() => colorfonts(opts()))
 check(hitCount() === 1, "deleted A product → A miss, B hit")
 check(existsSync("out/a/AIcons.css"), "A css restored")
 
 // cache:false → 重建 + 保留码位锁(非缓存产物)
-await capture(() => generateColorfonts(opts(false)))
+await capture(() => colorfonts(opts(false)))
 check(hitCount() === 0, "cache:false = miss (both)")
 check(existsSync("out/a/AIcons.codepoints.json"), "cache:false keeps codepoints lock (state, not cache product)")
 

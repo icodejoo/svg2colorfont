@@ -1,7 +1,7 @@
 // graphics-icon/svg —— SVG 雪碧图引擎 + CLI + 类型(Vite 能力请走 graphics-icon/vite)。
-import { generateSvgSprites, runCli } from 'svg-icons'
+import { svgIcons, runCli } from 'svg-icons'
 
-// 主函数 generateSvgSprites 另以项目名 svgIcons 导出，并作为默认导出（三者同价）。
-export { generateSvgSprites, generateSvgSprites as svgIcons, runCli }
-export default generateSvgSprites
+// 主函数(引擎)svgIcons —— 即项目名;亦作默认导出（两者同价）。
+export { svgIcons, runCli }
+export default svgIcons
 export type { SvgIconsOptions, SvgIconsCommon, SvgIconsItem, SvgIconsConfig, SvgIconsOutput, ColorOption, ColorFn, NormalizeOption } from 'svg-icons'

@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "paFirst": 57344,
+  "glyphs": {
+    "arrow-left": {
+      "codepoint": 57344,
+      "since": "2026-06-21",
+      "present": true
+    },
+    "badge-grad": {
+      "codepoint": 57345,
+      "since": "2026-06-21",
+      "present": true
+    },
+    "home": {
+      "codepoint": 57346,
+      "since": "2026-06-21",
+      "present": true
+    },
+    "logo-color": {
+      "codepoint": 57347,
+      "since": "2026-06-21",
+      "present": true
+    },
+    "star": {
+      "codepoint": 57348,
+      "since": "2026-06-21",
+      "present": true
+    }
+  }
+}

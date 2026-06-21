@@ -1,18 +1,18 @@
 ---
 name: bitmap-icons
-description: 在 D:\workspaces\colorfont 上维护 bitmap-icons 时参考。位图雪碧图引擎:用 sharp + maxrects-packer 把 png/jpg/webp/avif 打成单张图集,产出自适应样式、入口脚本(含 IconName 类型)与可选坐标 JSON。双形态(引擎 generateBitmapSheets + CLI runCli + 内部 Vite 插件工厂,经发布包 graphics-icon 的子路径 graphics-icon/bitmap 与 g-bitmap CLI 对外)。多实例 items[],按实例 cache/throwable。涉及共享 @codejoo/utils、buildStamp 指纹、共享缓存目录 .cache.graphics(统一 groupCache)、sharp 按需动态导入、单 bin 与不旋转约束、幂等写入等关键考量时阅读本文。
+description: 在 D:\workspaces\colorfont 上维护 bitmap-icons 时参考。位图雪碧图引擎:用 sharp + maxrects-packer 把 png/jpg/webp/avif 打成单张图集,产出自适应样式、入口脚本(含 IconName 类型)与可选坐标 JSON。双形态(引擎 bitmapIcons + CLI runCli + 内部 Vite 插件工厂,经发布包 graphics-icon 的子路径 graphics-icon/bitmap 与 bitmap-icons CLI 对外)。多实例 items[],按实例 cache/throwable。涉及共享 @codejoo/utils、buildStamp 指纹、共享缓存目录 .cache.graphics(统一 groupCache)、sharp 按需动态导入、单 bin 与不旋转约束、幂等写入等关键考量时阅读本文。
 ---
 
 # bitmap-icons
 
 ## 目的
 
-`bitmap-icons`(私有内部包)把一个目录下的位图(png/jpg/jpeg/webp/avif)打包成「一张」雪碧图集,并自动生成调用方直接可用的边车文件。它是 graphics-icon monorepo 中四个引擎之一,与 colorfont、svg-icons、imagemin 共享 `@codejoo/utils`,经发布包 `graphics-icon`(packages/exports)的子路径 `graphics-icon/bitmap` 与 CLI `g-bitmap` 对外。
+`bitmap-icons`(私有内部包)把一个目录下的位图(png/jpg/jpeg/webp/avif)打包成「一张」雪碧图集,并自动生成调用方直接可用的边车文件。它是 graphics-icon monorepo 中四个引擎之一,与 colorfont、svg-icons、imagemin 共享 `@codejoo/utils`,经发布包 `graphics-icon`(packages/exports)的子路径 `graphics-icon/bitmap` 与 CLI `bitmap-icons` 对外。
 
 **双形态**(与 imagemin 对齐):
-- 引擎 `generateBitmapSheets(options)`(Vite 之外一次性生成所有图集;经子路径 `graphics-icon/bitmap` 导入)。
-- CLI `runCli`(经发布包 bin `g-bitmap --config <file>`)。
-- 内部 Vite 插件工厂 `bitmapIcons(opts): Plugin`(经 `graphicsIcon({ bitmapIcons })` 集成,不单独对外导出)。
+- 引擎 `bitmapIcons(options)`(Vite 之外一次性生成所有图集;经子路径 `graphics-icon/bitmap` 导入)。
+- CLI `runCli`(经发布包 bin `bitmap-icons --config <file>`)。
+- 内部 Vite 插件工厂 `bitmapIconsVite(opts): Plugin`(经 `graphicsIcon({ bitmapIcons })` 集成,不单独对外导出)。
 
 ## 功能
 
@@ -53,7 +53,7 @@ export default {
 }
 ```
 
-单独使用(Vite 之外):`import { generateBitmapSheets } from "graphics-icon/bitmap"`（私有包名 `bitmap-icons` 仅 monorepo 内部用）。
+单独使用(Vite 之外):`import { bitmapIcons } from "graphics-icon/bitmap"`（私有包名 `bitmap-icons` 仅 monorepo 内部用）。
 
 调用方:
 
@@ -66,7 +66,7 @@ import { iconsImage, type IconName } from "@/sprites/common.sprite.ts"
 
 - **共享 utils**:`buildStamp`(`@codejoo/utils/fingerprint`,缓存指纹约定,与 svg-icons 同源)、`toGlobList`/`matchesAnyGlob`、`writeTextIfChanged`/`writeBufferIfChanged`,以及统一的 **`groupCache`**(`@codejoo/utils`,管多实例缓存)全部来自 `@codejoo/utils`(`workspace:*`)。不要在本包重新实现这些原语。跨包导入「不带」文件扩展名;包内相对导入「必须」带 `.ts`。
 - **按实例缓存 + 共享缓存目录 `.cache.graphics`**:每个 `items[]` 项一套独立缓存,经统一 `groupCache` 管理。缓存文件名 Vite 用 `cacheName`(仅文件名,落 `.cache.graphics/`)、独立用 `cacheFilename`(全路径);省略则按 `output.image` 派生。`cache:false` 删该实例缓存 + 旧产物并重建。(旧的插件级 `cacheDir`、全路径 `cacheFile`、`resolveCacheFile`/`pruneCache` 三件套已被 `groupCache` 取代。)
-- **sharp 按需动态导入**:`sharp` 与 `maxrects-packer` 用 `await import()` 在 `generateSheet` 内部加载,绝不在模块顶层。仅 `import { bitmapIcons }` 不会拉起/分配这些重依赖。
+- **sharp 按需动态导入**:`sharp` 与 `maxrects-packer` 用 `await import()` 在 `generateSheet` 内部加载,绝不在模块顶层。仅 `import { bitmapIconsVite }` 不会拉起/分配这些重依赖。
 - **`allowRotation: false`**:CSS background 切片不能旋转,打包器强制不旋转。
 - **单 bin 约束**:必须落「一个」bin;单图超 `maxWidth×maxHeight` 或总量放不下 → 明确报错,绝不静默拆成多张。
 - **幂等写入**:图与文本边车都「内容/字节未变则跳过」,避免无谓 mtime/git 抖动与 dev HMR 循环。

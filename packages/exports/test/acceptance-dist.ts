@@ -33,7 +33,7 @@ await viteBuild({
   // 用已构建的发布插件(default 导出),开 colrv1(应触发相对 wasm 加载),实物落盘到 .gen
   plugins: [
     graphicsIcon({
-      colorfont: {
+      colorfonts: {
         colorFormat: 'colrv1',
         formats: ['woff2'],
         items: [{ input: fixtures, outDir: gen, fontName: 'AccIcons' }],

@@ -12,7 +12,7 @@
 import { resolve } from "node:path"
 import { pathToFileURL } from "node:url"
 
-import { generateSvgSprites } from "./create.ts"
+import { svgIcons } from "./create.ts"
 
 import type { SvgIconsOptions } from "./types.ts"
 
@@ -32,7 +32,7 @@ export async function runCli(argv: string[] = process.argv.slice(2)): Promise<vo
   }
   const mod = (await import(pathToFileURL(resolve(configPath)).href)) as { default?: SvgIconsOptions } & Partial<SvgIconsOptions>
   const options = (mod.default ?? mod) as SvgIconsOptions
-  await generateSvgSprites(options)
+  await svgIcons(options)
   console.log("[svg-icons] 完成")
 }
 

@@ -12,7 +12,7 @@
 import { resolve } from "node:path"
 import { pathToFileURL } from "node:url"
 
-import { generateBitmapSheets } from "./generate-sheet.ts"
+import { bitmapIcons } from "./generate-sheet.ts"
 
 import type { BitmapIconsOptions } from "./types.ts"
 
@@ -32,7 +32,7 @@ export async function runCli(argv: string[] = process.argv.slice(2)): Promise<vo
   }
   const mod = (await import(pathToFileURL(resolve(configPath)).href)) as { default?: BitmapIconsOptions } & Partial<BitmapIconsOptions>
   const options = (mod.default ?? mod) as BitmapIconsOptions
-  await generateBitmapSheets(options)
+  await bitmapIcons(options)
   console.log("[bitmap-icons] 完成")
 }
 

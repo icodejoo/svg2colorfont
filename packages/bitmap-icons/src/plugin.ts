@@ -9,7 +9,7 @@
 
 import { isAbsolute, relative, resolve } from "node:path"
 
-import { generateBitmapSheets } from "./generate-sheet.ts"
+import { bitmapIcons } from "./generate-sheet.ts"
 
 import type { BitmapIconsItem, BitmapIconsOptions } from "./types.ts"
 import type { Plugin } from "vite"
@@ -20,7 +20,7 @@ function resolveItems(o: BitmapIconsOptions): BitmapIconsItem[] {
   return items.map((it) => ({ ...common, ...it }))
 }
 
-export function bitmapIcons(options: BitmapIconsOptions): Plugin {
+export function bitmapIconsVite(options: BitmapIconsOptions): Plugin {
   const items = resolveItems(options)
   const roots = items.map((c) => resolve(c.inputDir))
   // 各组自身产物的绝对路径:写它们不应触发重生成(产物可与源同目录,否则自激发循环)。
@@ -39,13 +39,13 @@ export function bitmapIcons(options: BitmapIconsOptions): Plugin {
   return {
     name: "vite-plugin-bitmap-icons",
     async buildStart() {
-      await generateBitmapSheets(options)
+      await bitmapIcons(options)
     },
     async watchChange(id) {
-      if (affects(id)) await generateBitmapSheets(options)
+      if (affects(id)) await bitmapIcons(options)
     },
     async handleHotUpdate({ file }) {
-      if (affects(file)) await generateBitmapSheets(options)
+      if (affects(file)) await bitmapIcons(options)
     },
   }
 }

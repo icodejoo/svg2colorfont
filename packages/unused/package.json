@@ -1,0 +1,51 @@
+{
+  "name": "@codejoo/unused",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Detect unused static assets during Vite build (module-graph diff -> manifest table) and delete them on demand (removeUnused / remove-unused CLI). Engine inputs/outputs are auto-excluded when used via the graphics-icon umbrella, so icon sources are never flagged.",
+  "type": "module",
+  "license": "MIT",
+  "keywords": [
+    "vite-plugin",
+    "unused",
+    "dead-assets",
+    "cleanup",
+    "prune"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/icodejoo/graphics-icon.git",
+    "directory": "packages/unused"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@codejoo/utils": "workspace:*"
+  },
+  "peerDependencies": {
+    "vite": "^5 || ^6 || ^7 || ^8"
+  },
+  "peerDependenciesMeta": {
+    "vite": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.6.0",
+    "vite": "catalog:",
+    "tsup": "^8.0.0"
+  },
+  "scripts": {
+    "build": "tsup"
+  }
+}

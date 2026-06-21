@@ -18,7 +18,7 @@ description: >-
 - Vite 插件薄封装在私有包 `@graphics-icon/vite-umbrella`(`packages/vite-plugin`,仅含伞插件),从 `@codejoo/colorfont` 导入引擎;
   对外发布物是 `graphics-icon`(`packages/exports`),再导出伞插件为 `graphics-icon/vite`、引擎为 `graphics-icon/colorfont`。
 - `src/cli/`:build/watch/check。`run(argv)` 在 `cli/cli.ts`,经 index 以 **`runCli`** 再导出(供发布包 bin
-  `g-colorfont` 复用)。引擎双形态:`build`/`buildAndWrite`/`generateColorfonts`(可编程)+ `runCli`(CLI)。
+  `color-fonts` 复用)。引擎双形态:`build`/`buildAndWrite`/`colorfonts`(可编程)+ `runCli`(CLI)。
 - `colrv1-writer/`(Rust→wasm):COLRv1 写表。`woff2`(Rust→wasm):可调质量 woff2 编码。
 - `scripts/`、`test/cli.test.ts`、`fixtures/`、`README.md`。无 tsup(发布包 tsup 内联本包源码)。
 
@@ -33,7 +33,7 @@ svgo×2 + viewBox 放大 1024 整数化,故 `prepareOne` 为 async)→ parseSvg 
 buildFlavors(mono=svg2ttf;colrv0=手写 COLRv0+CPAL 注入;otsvg=手写 `SVG ` 表注入;colrv1=write-fonts wasm)
 → 各档 toWoff2/toWoff → `buildAndWrite(item)` 用 `@codejoo/utils/fs-write` 幂等写入,把字体 + `<fontName>.css`(双 @font-face + tech 链)
 + `<fontName>.ts`(emitDts)+ `<fontName>.codepoints.json` 全部写进 `outDir`。**实物落盘,无虚拟模块**;消费方 `import './fonts/AppIcons.css'`
-+ `import { icons, type IconName } from './fonts/AppIcons'`。`generateColorfonts({items})` 多实例批量(每 item 独立缓存/产物)。`emitDemo`/gallery 已移除。
++ `import { icons, type IconName } from './fonts/AppIcons'`。`colorfonts({items})` 多实例批量(每 item 独立缓存/产物)。`emitDemo`/gallery 已移除。
 
 ## 关键选型(及为什么)
 - 引擎全 glyf 不用 CFF(opentype.js 只能写 CFF;glyf 更小、解锁 woff2 生态),opentype.js 降为只读解析。

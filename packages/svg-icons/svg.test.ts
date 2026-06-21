@@ -2,7 +2,7 @@
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { resolve } from "node:path"
 
-import { generateSvgSprites } from "./src/create.ts"
+import { svgIcons } from "./src/create.ts"
 
 const root = resolve(process.cwd(), ".svg-test-tmp")
 rmSync(root, { recursive: true, force: true })
@@ -45,29 +45,29 @@ const opts = (cache = true) => ({
   items: [{ input: "icons", output: { svg: "out/icons.svg", script: "out/icons.ts" } }],
 })
 
-await capture(() => generateSvgSprites(opts()))
+await capture(() => svgIcons(opts()))
 check(existsSync("out/icons.svg"), "sprite svg generated")
 check(existsSync("out/icons.ts"), "script generated")
 const cacheFile = resolve(root, ".cache.graphics/svg-icons-icons.json")
 check(existsSync(cacheFile), "per-instance cache file written (svg-icons-icons.json)")
 check(!hadHit(), "1st run = miss")
 
-await capture(() => generateSvgSprites(opts()))
+await capture(() => svgIcons(opts()))
 check(hadHit(), "2nd run unchanged = HIT")
 
 // 改输入 → miss
 writeFileSync("icons/extra.svg", `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#333"/></svg>`)
-await capture(() => generateSvgSprites(opts()))
+await capture(() => svgIcons(opts()))
 check(!hadHit(), "added input = miss")
 
 // 删产物 → miss(existsSync 校验)
 rmSync("out/icons.ts")
-await capture(() => generateSvgSprites(opts()))
+await capture(() => svgIcons(opts()))
 check(!hadHit(), "deleted product = miss")
 check(existsSync("out/icons.ts"), "deleted product restored")
 
 // cache:false → 删旧产物+json,强制重建
-await capture(() => generateSvgSprites(opts(false)))
+await capture(() => svgIcons(opts(false)))
 check(!hadHit(), "cache:false = miss")
 check(existsSync("out/icons.svg") && existsSync(cacheFile), "cache:false rebuilt products + cache")
 

@@ -139,6 +139,9 @@ importers:
       '@codejoo/imagemin':
         specifier: workspace:*
         version: link:../imagemin
+      '@codejoo/unused':
+        specifier: workspace:*
+        version: link:../unused
       '@codejoo/utils':
         specifier: workspace:*
         version: link:../utils
@@ -223,6 +226,25 @@ importers:
         specifier: 'catalog:'
         version: 8.0.16(@types/node@24.13.2)(esbuild@0.27.7)
 
+  packages/unused:
+    dependencies:
+      '@codejoo/utils':
+        specifier: workspace:*
+        version: link:../utils
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.13.2
+      tsup:
+        specifier: ^8.0.0
+        version: 8.5.1(postcss@8.5.15)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
+      vite:
+        specifier: 'catalog:'
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.27.7)
+
   packages/utils:
     dependencies:
       scale-that-svg:
@@ -250,6 +272,9 @@ importers:
       '@codejoo/imagemin':
         specifier: workspace:*
         version: link:../imagemin
+      '@codejoo/unused':
+        specifier: workspace:*
+        version: link:../unused
       bitmap-icons:
         specifier: workspace:*
         version: link:../bitmap-icons

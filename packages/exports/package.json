@@ -1,6 +1,6 @@
 {
   "name": "graphics-icon",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
   "license": "MIT",
   "description": "Icon/image build toolkit: color icon webfont + bitmap sprite sheets + SVG symbol sprites + imagemin. Vite plugin (graphics-icon/vite) + standalone engines/CLI per subpath (graphics-icon/bitmap, /svg, /imagemin, /colorfont), with per-instance caching and on-demand loading.",
@@ -46,20 +46,25 @@
     "./colorfont": {
       "types": "./dist/colorfont.d.ts",
       "import": "./dist/colorfont.js"
+    },
+    "./unused": {
+      "types": "./dist/unused.d.ts",
+      "import": "./dist/unused.js"
     }
   },
   "bin": {
-    "g-min": "./dist/bin.js",
-    "g-bitmap": "./dist/bin-bitmap.js",
-    "g-svg": "./dist/bin-svg.js",
-    "g-colorfont": "./dist/bin-colorfont.js"
+    "image-min": "./dist/bin.js",
+    "bitmap-icons": "./dist/bin-bitmap.js",
+    "svg-icons": "./dist/bin-svg.js",
+    "color-fonts": "./dist/bin-colorfont.js",
+    "remove-unused": "./dist/bin-unused.js"
   },
   "files": [
     "dist",
     "README.md"
   ],
   "scripts": {
-    "build": "tsup && node scripts/copy-wasm.mjs",
+    "build": "pnpm --filter \"!graphics-icon\" build && tsup && node scripts/copy-wasm.mjs",
     "test": "node test/acceptance.ts && node test/acceptance-dist.ts",
     "prepublishOnly": "pnpm build",
     "pub": "pnpm build && npm version patch --no-git-tag-version && git -C ../.. add -A && git -C ../.. commit -m \"release: graphics-icon\" && git -C ../.. push && pnpm publish --no-git-checks"
@@ -90,6 +95,7 @@
     "bitmap-icons": "workspace:*",
     "svg-icons": "workspace:*",
     "@codejoo/imagemin": "workspace:*",
+    "@codejoo/unused": "workspace:*",
     "@codejoo/utils": "workspace:*",
     "tsup": "^8.0.0",
     "typescript": "^5.6.0",

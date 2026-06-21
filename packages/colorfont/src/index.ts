@@ -223,7 +223,7 @@ export async function buildAndWrite(options: ColorfontItem): Promise<BuildResult
  * 批量(多字体实例)引擎入口:按 items 生成所有字体,各自独立缓存。
  * 单实例失败:throwable!==false → 抛错中止;否则告警继续。
  */
-export async function generateColorfonts(options: ColorfontOptions): Promise<void> {
+export async function colorfonts(options: ColorfontOptions): Promise<void> {
   for (const item of resolveItems(options)) {
     try {
       const r = await buildAndWrite(item)

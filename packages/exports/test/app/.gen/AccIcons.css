@@ -1,0 +1,27 @@
+@font-face {
+  font-family: "AccIcons";
+  font-display: block;
+  src: url("./AccIcons.mono.7d089a8a.woff2") format("woff2") /* WOFF2:Chrome/Edge/Firefox/Safari 等所有现代浏览器 */,
+       url("./AccIcons.mono.0d47e37d.woff") format("woff") /* WOFF:更老的浏览器(IE11 / 旧版 Safari) */;
+}
+
+/* 现代浏览器:tech() 各取所需(后写的 @font-face 同 family 覆盖上面的保底) */
+@font-face {
+  font-family: "AccIcons";
+  font-display: block;
+  src:
+    url("./AccIcons.otsvg.aee32882.woff2") format("woff2") tech(color-svg) /* Safari / iOS:OT-SVG(Chromium 永不支持 OT-SVG,故此格式专供 Safari) */,
+    url("./AccIcons.colrv0.c1a7198c.woff2") format("woff2") tech(color-colrv0) /* 较旧的 Chrome/Edge/Firefox:COLRv0 平涂多色(不支持渐变) */,
+    url("./AccIcons.mono.7d089a8a.woff2") format("woff2") /* 所有浏览器:单色轮廓回退(渲染器不认彩色表时用) */;
+}
+
+.icon {
+  font: inherit;
+  font-family: "AccIcons" !important;
+  -webkit-font-smoothing: antialiased;
+}
+.icon-arrow-left::before { content: "\e000"; }
+.icon-badge-grad::before { content: "\e001"; }
+.icon-home::before { content: "\e002"; }
+.icon-logo-color::before { content: "\e003"; }
+.icon-star::before { content: "\e004"; }

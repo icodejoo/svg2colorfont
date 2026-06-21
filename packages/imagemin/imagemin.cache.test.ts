@@ -2,7 +2,7 @@
 import { mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { resolve } from "node:path"
 
-import { optimizeImages } from "./src/imagemin.ts"
+import { imagemin } from "./src/imagemin.ts"
 
 const root = resolve(process.cwd(), ".imagemin-test-tmp")
 rmSync(root, { recursive: true, force: true })
@@ -24,20 +24,20 @@ const base = { include: "**/*.{svg,png}", cacheFile, logStats: false, svgSize: 1
 
 writeFileSync("a.svg", `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1" width="22" height="22" fill="#ff0000"/></svg>`)
 
-let r = await optimizeImages([resolve("a.svg")], { ...base })
+let r = await imagemin([resolve("a.svg")], { ...base })
 check(r.results[0].skipped === false, "svg 1st run = processed")
 
-r = await optimizeImages([resolve("a.svg")], { ...base })
+r = await imagemin([resolve("a.svg")], { ...base })
 check(r.results[0].skipped === true, "svg 2nd run = cache HIT (skip)")
 
-r = await optimizeImages([resolve("a.svg")], { ...base, svgSize: 512 })
+r = await imagemin([resolve("a.svg")], { ...base, svgSize: 512 })
 check(r.results[0].skipped === false, "config change (svgSize) → configHash mismatch → reprocess all")
 
-// throwable 默认 true:损坏图 → sharp 抛错 → optimizeImages 抛出中止
+// throwable 默认 true:损坏图 → sharp 抛错 → imagemin 抛出中止
 writeFileSync("bad.png", "not-a-real-png")
 let threw = false
 try {
-  await optimizeImages([resolve("bad.png")], { ...base })
+  await imagemin([resolve("bad.png")], { ...base })
 } catch {
   threw = true
 }
@@ -45,9 +45,9 @@ check(threw, "throwable default(true): corrupt image throws")
 
 // throwable:false → 不抛,告警并继续,结果含 error
 let threw2 = false
-let res2: Awaited<ReturnType<typeof optimizeImages>> | undefined
+let res2: Awaited<ReturnType<typeof imagemin>> | undefined
 try {
-  res2 = await optimizeImages([resolve("bad.png")], { ...base, throwable: false })
+  res2 = await imagemin([resolve("bad.png")], { ...base, throwable: false })
 } catch {
   threw2 = true
 }

@@ -229,7 +229,7 @@ async function mapPool<T, R>(items: T[], limit: number, fn: (item: T) => Promise
   return out
 }
 
-export async function optimizeImages(files: string[], options: ImageminOptions): Promise<OptimizeResult> {
+export async function imagemin(files: string[], options: ImageminOptions): Promise<OptimizeResult> {
   // 缓存文件：可选；省略时落共享目录 .cache.graphics/imagemin.json。
   // 统一逐文件缓存(含反查表):路径命中→skip;内容指纹命中(改名/移动/复制)→moved(迁移 key);否则 process。
   // configHash 并入压缩参数:参数变 → 整表作废、全部按新参数重压。

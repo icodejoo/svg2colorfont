@@ -1,9 +1,9 @@
 // 真实验收:用真正的 Vite 跑一次 build,验证伞插件「实物落盘」+ vite 正常打包。
 //   · colorfont:buildStart 把字体 + .css + .ts 写到 outDir(app/.gen);app 导入该 .css → vite 打包字体。
 //   · svgIcons :buildStart 把 sprite svg + script 写到磁盘。
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { build as viteBuild } from 'vite'
@@ -16,6 +16,9 @@ const fixtures = resolve(here, '../../colorfont/fixtures')
 const distDir = resolve(here, '.acc-dist')
 const gen = resolve(appRoot, '.gen') // colorfont 实物落盘(被 app/main.ts 导入)
 const svgGen = resolve(here, '.acc-svg')
+// unused 检测用:scan root 下放「引擎输入(icons/a.svg)」+「孤儿资产(orphan.png)」。
+const unusedRoot = resolve(here, '.acc-unused')
+const unusedManifest = resolve(here, '.acc-unused.json')
 
 function assert(c: unknown, m: string): asserts c {
   if (!c) throw new Error('ASSERT FAILED: ' + m)
@@ -33,6 +36,13 @@ function walk(dir: string, base = dir): string[] {
 await rm(distDir, { recursive: true, force: true })
 await rm(gen, { recursive: true, force: true })
 await rm(svgGen, { recursive: true, force: true })
+await rm(unusedRoot, { recursive: true, force: true })
+await rm(unusedManifest, { force: true })
+
+// 准备 unused scan root:icons/a.svg 作为额外 svgIcons 实例的输入(应被自动排除);orphan.png 无人引用(应被检出)。
+mkdirSync(resolve(unusedRoot, 'icons'), { recursive: true })
+writeFileSync(resolve(unusedRoot, 'icons', 'a.svg'), '<svg viewBox="0 0 1 1"><path d="M0 0h1v1H0z"/></svg>')
+writeFileSync(resolve(unusedRoot, 'orphan.png'), 'not-referenced')
 
 // ============================ 真实 vite build(伞插件:colorfont + svgIcons) ============================
 await viteBuild({
@@ -43,15 +53,21 @@ await viteBuild({
   build: { outDir: distDir, emptyOutDir: true },
   plugins: [
     graphicsIcon({
-      colorfont: {
+      colorfonts: {
         colorFormat: 'auto',
         formats: ['woff2', 'woff'],
         items: [{ input: fixtures, outDir: gen, fontName: 'AccIcons' }],
       },
       svgIcons: {
         color: true,
-        items: [{ input: fixtures, output: { svg: join(svgGen, 'icons.svg'), script: join(svgGen, 'icons.ts') } }],
+        items: [
+          { input: fixtures, output: { svg: join(svgGen, 'icons.svg'), script: join(svgGen, 'icons.ts') } },
+          // 额外实例:输入在 unusedRoot/icons 下 → 其 a.svg 应被 unused 自动排除(引擎输入,不应误删)。
+          { input: resolve(unusedRoot, 'icons'), output: { svg: join(svgGen, 'extra.svg'), script: join(svgGen, 'extra.ts') } },
+        ],
       },
+      // 未使用资产检测:扫描 unusedRoot;引擎输入(icons/**)由伞插件自动排除。
+      unused: { root: unusedRoot, ext: ['.svg', '.png'], output: unusedManifest },
     }),
   ],
 })
@@ -79,4 +95,16 @@ const fontsBundled = files.some((f) => f.endsWith('.woff2')) || cssText.includes
 assert(fontsBundled, 'colorfont 字体经真实 vite build 打包进 dist(独立 .woff2 或内联 data URI)')
 assert(cssText.includes('@font-face') && cssText.includes('tech('), 'dist CSS 含 @font-face + tech() 回退链')
 
-console.log('\n✅ VITE ACCEPTANCE OK(伞插件实物落盘:colorfont→outDir + svg→磁盘;字体经真实 vite build 打包进 dist)')
+// ── unused:检出孤儿资产、且引擎输入被自动排除(不误删图标源) ──
+assert(existsSync(unusedManifest), 'unused 清单表已写出')
+const manifest = JSON.parse(readFileSync(unusedManifest, 'utf8')) as { unused: string[] }
+const orphanRel = relative(process.cwd(), resolve(unusedRoot, 'orphan.png')).replace(/\\/g, '/')
+const engineInputRel = relative(process.cwd(), resolve(unusedRoot, 'icons', 'a.svg')).replace(/\\/g, '/')
+console.log('[unused] manifest.unused:', manifest.unused.join(', ') || '(空)')
+assert(manifest.unused.includes(orphanRel), 'unused 检出孤儿资产 orphan.png')
+assert(!manifest.unused.includes(engineInputRel), 'unused 自动排除引擎输入 icons/a.svg(不会被误删)')
+
+await rm(unusedRoot, { recursive: true, force: true })
+await rm(unusedManifest, { force: true })
+
+console.log('\n✅ VITE ACCEPTANCE OK(伞插件实物落盘:colorfont→outDir + svg→磁盘;字体经真实 vite build 打包进 dist;unused 检出孤儿且自动排除引擎输入)')

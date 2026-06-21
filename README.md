@@ -10,7 +10,7 @@
 pnpm install graphics-icon
 ```
 
-发布包 `graphics-icon` 在 [`packages/exports`](packages/exports)。它**仅有子路径导出**(无裸 `.`):`graphics-icon/vite`(伞插件)、`graphics-icon/colorfont`、`graphics-icon/svg`、`graphics-icon/bitmap`、`graphics-icon/imagemin`,外加 4 个 CLI:`g-colorfont`/`g-svg`/`g-bitmap`/`g-min`。
+发布包 `graphics-icon` 在 [`packages/exports`](packages/exports)。它**仅有子路径导出**(无裸 `.`):`graphics-icon/vite`(伞插件)、`graphics-icon/colorfont`、`graphics-icon/svg`、`graphics-icon/bitmap`、`graphics-icon/imagemin`,外加 5 个 CLI:`color-fonts`/`svg-icons`/`bitmap-icons`/`image-min`/`remove-unused`。
 
 ```ts
 // vite.config.ts
@@ -21,7 +21,7 @@ export default defineConfig({
   plugins: [
     graphicsIcon({
       // 每个子能力(colorfont/svgIcons/bitmapIcons)均为多实例 { ...公共, items: [...] };imagemin 为单例
-      colorfont: { colorFormat: 'auto', items: [{ input: 'src/icons/color', outDir: 'src/fonts', fontName: 'AppIcons' }] },
+      colorfonts: { colorFormat: 'auto', items: [{ input: 'src/icons/color', outDir: 'src/fonts', fontName: 'AppIcons' }] },
       svgIcons: { items: [{ input: 'src/icons/svg', output: { svg: 'src/sprites/icons.svg', script: 'src/sprites/icons.ts' }, color: true }] },
       bitmapIcons: { items: [{ inputDir: 'src/icons/png', output: { image: 'src/sprites/sheet.webp', style: 'src/sprites/sheet.css' } }] },
       imagemin: { enabled: true },   // 构建产物图片压缩;enabled:false 可关
@@ -69,7 +69,7 @@ Bundles the common "graphic asset → shippable output" build needs into one plu
 pnpm install graphics-icon
 ```
 
-The published package `graphics-icon` lives in [`packages/exports`](packages/exports). It has **subpath exports only** (no bare `.`): `graphics-icon/vite` (umbrella plugin), `graphics-icon/colorfont`, `graphics-icon/svg`, `graphics-icon/bitmap`, `graphics-icon/imagemin`, plus 4 CLIs: `g-colorfont`/`g-svg`/`g-bitmap`/`g-min`.
+The published package `graphics-icon` lives in [`packages/exports`](packages/exports). It has **subpath exports only** (no bare `.`): `graphics-icon/vite` (umbrella plugin), `graphics-icon/colorfont`, `graphics-icon/svg`, `graphics-icon/bitmap`, `graphics-icon/imagemin`, plus 5 CLIs: `color-fonts`/`svg-icons`/`bitmap-icons`/`image-min`/`remove-unused`.
 
 ```ts
 // vite.config.ts
@@ -80,7 +80,7 @@ export default defineConfig({
   plugins: [
     graphicsIcon({
       // each capability (colorfont/svgIcons/bitmapIcons) is multi-instance { ...common, items: [...] }; imagemin is a singleton
-      colorfont: { colorFormat: 'auto', items: [{ input: 'src/icons/color', outDir: 'src/fonts', fontName: 'AppIcons' }] },
+      colorfonts: { colorFormat: 'auto', items: [{ input: 'src/icons/color', outDir: 'src/fonts', fontName: 'AppIcons' }] },
       svgIcons: { items: [{ input: 'src/icons/svg', output: { svg: 'src/sprites/icons.svg', script: 'src/sprites/icons.ts' }, color: true }] },
       bitmapIcons: { items: [{ inputDir: 'src/icons/png', output: { image: 'src/sprites/sheet.webp', style: 'src/sprites/sheet.css' } }] },
       imagemin: { enabled: true },   // optimize build-output images; enabled:false to turn off

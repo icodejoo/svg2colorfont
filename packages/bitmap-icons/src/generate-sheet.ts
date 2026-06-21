@@ -190,7 +190,7 @@ function resolveItems(o: BitmapIconsOptions): BitmapIconsItem[] {
  * 引擎入口（Vite 之外可单独调用）：按 items 生成所有图集 + 边车,维护各实例缓存。
  * 单实例失败:throwable!==false → 抛错中止;否则告警继续。
  */
-export async function generateBitmapSheets(options: BitmapIconsOptions): Promise<void> {
+export async function bitmapIcons(options: BitmapIconsOptions): Promise<void> {
   for (const item of resolveItems(options)) {
     try {
       await generateSheet(item)

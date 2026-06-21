@@ -5,8 +5,8 @@
 
 本包是发布包 [`graphics-icon`](../exports)（在 `packages/exports`）的 **colorfont 引擎**。它有两种用法：
 
-- **集成进 Vite**：经 `graphicsIcon({ colorfont: {...} })`（完整插件选项见[发布包 README](../exports/README.md#colorfont-options)）。
-- **单独使用**：从 `graphics-icon/colorfont` import 引擎函数，或用 CLI（`g-colorfont`）——见下文。
+- **集成进 Vite**：经 `graphicsIcon({ colorfonts: {...} })`（完整插件选项见[发布包 README](../exports/README.md#colorfonts-options)）。
+- **单独使用**：从 `graphics-icon/colorfont` import 引擎函数，或用 CLI（`color-fonts`）——见下文。
 
 `colorFormat: 'auto'` 会把一个 SVG 目录变成可共存于一条 `@font-face` 回退链的多档字形，现代浏览器各取所能支持的最佳：
 
@@ -26,7 +26,7 @@ WOFF2 容器由 `ttf2woff2`（Rust）→ wasm 编码（预编译内置）。
 从发布包子路径 `graphics-icon/colorfont` 导入引擎函数（私有包名 `@codejoo/colorfont` 仅 monorepo 内部用）：
 
 ```ts
-import { build, buildAndWrite, generateColorfonts } from 'graphics-icon/colorfont'
+import { build, buildAndWrite, colorfonts } from 'graphics-icon/colorfont'
 
 // 纯函数：产出 Buffer + 元数据 + CSS/TS 生成器，不落盘
 const result = await build({ input: 'icons', outDir: 'fonts', fontName: 'AppIcons' })
@@ -35,7 +35,7 @@ const result = await build({ input: 'icons', outDir: 'fonts', fontName: 'AppIcon
 await buildAndWrite({ input: 'icons', outDir: 'fonts', fontName: 'AppIcons' })
 
 // 批量（多实例 items[]）
-await generateColorfonts({ colorFormat: 'auto', items: [{ input: 'icons', outDir: 'fonts', fontName: 'AppIcons' }] })
+await colorfonts({ colorFormat: 'auto', items: [{ input: 'icons', outDir: 'fonts', fontName: 'AppIcons' }] })
 ```
 
 **实物落盘 / 无虚拟模块**：产物是真实文件，消费方用普通 import：`import './fonts/AppIcons.css'` + `import { icons, type IconName } from './fonts/AppIcons'`。
@@ -43,8 +43,8 @@ await generateColorfonts({ colorFormat: 'auto', items: [{ input: 'icons', outDir
 ### CLI
 
 ```bash
-g-colorfont build --input icons --out fonts --name AppIcons   # 另有 watch / check
-g-colorfont check   # 校验码位锁稳定（CI / pre-commit）
+color-fonts build --input icons --out fonts --name AppIcons   # 另有 watch / check
+color-fonts check   # 校验码位锁稳定（CI / pre-commit）
 ```
 
 ## 导出 API / Exports
@@ -53,8 +53,8 @@ g-colorfont check   # 校验码位锁稳定（CI / pre-commit）
 | --- | --- | --- |
 | `build(item)` | `(o: ColorfontOptions) => Promise<BuildResult>` | 纯函数构建，返回字体资产 + 元数据 + `emitCss`/`dts`，不落盘。 |
 | `buildAndWrite(item)` | `(o: ColorfontOptions) => Promise<BuildResult \| null>` | 构建并把产物写入 `outDir`（`null` = 缓存命中），更新码位锁。 |
-| `generateColorfonts(options)` | `(o: { ...common, items: [...] }) => Promise<...>` | 多实例批量构建并落盘。 |
-| `runCli(argv)` | `(argv: string[]) => Promise<number>` | CLI 入口（被 `g-colorfont` 复用），返回退出码。 |
+| `colorfonts(options)` | `(o: { ...common, items: [...] }) => Promise<...>` | 多实例批量构建并落盘。 |
+| `runCli(argv)` | `(argv: string[]) => Promise<number>` | CLI 入口（被 `color-fonts` 复用），返回退出码。 |
 | `readLockfile(file, paStart)` | `(file, paStart) => Promise<...>` | 读取码位锁文件。 |
 | `serializeLockfile(lock)` | `(lock) => string` | 序列化码位锁。 |
 | 类型 | `ColorfontOptions` / `BuildResult` / `FontAsset` / `FontFlavor` / `FontFormat` / `FontMetadata` / `GlyphMeta` / `ColorFormat` | 选项与结果类型。 |

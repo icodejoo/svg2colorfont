@@ -16,10 +16,11 @@
  * See README for a vite.config example.
  */
 
-export { bitmapIcons } from "./plugin.ts"
+// 引擎(Vite 之外单独使用):函数用法即项目名 bitmapIcons。 / Engine = project name.
+export { bitmapIcons } from "./generate-sheet.ts"
 
-// 引擎(Vite 之外单独使用) + CLI 入口 —— 与 imagemin 对齐:可编程调用,也可经 bin 运行。
-export { generateBitmapSheets } from "./generate-sheet.ts"
+// Vite 插件工厂:引擎名 + Vite 后缀。CLI 入口 —— 与 imagemin 对齐:可编程调用,也可经 bin 运行。
+export { bitmapIconsVite } from "./plugin.ts"
 export { runCli } from "./bin.ts"
 
 export type { BitmapIconsOptions, BitmapIconsCommon, BitmapIconsItem, BitmapIconsConfig, BitmapIconsOutput, IconFrame, IconManifest, IconSheetMeta } from "./types.ts"

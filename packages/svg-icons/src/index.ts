@@ -12,10 +12,10 @@
  *
  * 用法 / Usage:
  *   // vite.config.ts
- *   import { svgIcons } from "vite-plugin-svg-icons"
+ *   import { svgIconsVite } from "vite-plugin-svg-icons"
  *   export default defineConfig({
  *     plugins: [
- *       svgIcons({
+ *       svgIconsVite({
  *         sprites: [
  *           {
  *             input: "src/assets/icons",
@@ -36,10 +36,11 @@
  *   <use :href="`${iconsHref}#${iconsName.foo}`" />
  */
 
+// 引擎(Vite 之外单独使用):函数用法即项目名 svgIcons。 / Engine = project name.
 export { svgIcons } from "./create.ts"
 
-// 引擎(Vite 之外单独使用) + CLI 入口 —— 与 imagemin 对齐:可编程调用,也可经 bin 运行。
-export { generateSvgSprites } from "./create.ts"
+// Vite 插件工厂:引擎名 + Vite 后缀。CLI 入口 —— 与 imagemin 对齐:可编程调用,也可经 bin 运行。
+export { svgIconsVite } from "./create.ts"
 export { runCli } from "./bin.ts"
 
 export type { SvgIconsOptions, SvgIconsCommon, SvgIconsItem, SvgIconsConfig, SvgIconsOutput, ColorOption, ColorFn, NormalizeOption } from "./types.ts"

@@ -120,7 +120,7 @@ async function generateOne(item: SvgIconsItem, underlyingBuildStart?: () => Prom
  * 引擎入口（Vite 之外可单独调用）：按 items 生成所有 SVG 雪碧图 + 类型化脚本,维护各实例缓存。
  * 单实例失败:throwable!==false → 抛错中止;否则告警继续。
  */
-export async function generateSvgSprites(options: SvgIconsOptions): Promise<void> {
+export async function svgIcons(options: SvgIconsOptions): Promise<void> {
   const items = resolveItems(options)
   const { iconsSpritesheet } = await import("vite-plugin-icons-spritesheet")
   const underlying = iconsSpritesheet(items.map(toUnderlying) as Parameters<typeof iconsSpritesheet>[0]) as Plugin[]
@@ -144,7 +144,7 @@ export async function generateSvgSprites(options: SvgIconsOptions): Promise<void
  * vite 插件工厂：返回单个 Plugin。buildStart 生成全部;源目录变更(watch/HMR)则重生成。
  * Vite plugin factory: a single Plugin; regenerates on source changes.
  */
-export function svgIcons(options: SvgIconsOptions): Plugin {
+export function svgIconsVite(options: SvgIconsOptions): Plugin {
   const items = resolveItems(options)
   const roots = items.map((c) => resolve(c.input))
   const ownOutputs = new Set(items.flatMap((c) => [c.output.svg, c.output.script].filter((p): p is string => Boolean(p)).map((p) => resolve(p))))
@@ -160,13 +160,13 @@ export function svgIcons(options: SvgIconsOptions): Plugin {
   return {
     name: "vite-plugin-svg-icons",
     async buildStart() {
-      await generateSvgSprites(options)
+      await svgIcons(options)
     },
     async watchChange(id) {
-      if (affects(id)) await generateSvgSprites(options)
+      if (affects(id)) await svgIcons(options)
     },
     async handleHotUpdate({ file }) {
-      if (affects(file)) await generateSvgSprites(options)
+      if (affects(file)) await svgIcons(options)
     },
   }
 }

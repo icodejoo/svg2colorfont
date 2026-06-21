@@ -12,12 +12,13 @@ The package has **subpath exports only** (no bare `.`):
 | Import | What you get | Needs Vite? |
 | --- | --- | --- |
 | `graphics-icon/vite` | The umbrella **Vite plugin** `graphicsIcon` (default) composing all four capabilities | yes (peer) |
-| `graphics-icon/colorfont` | colorfont engine: `build` · `buildAndWrite` · `generateColorfonts` · `runCli` + types | no |
-| `graphics-icon/svg` | svg engine: `generateSvgSprites` · `runCli` + types | no |
-| `graphics-icon/bitmap` | bitmap engine: `generateBitmapSheets` · `runCli` + types | no |
-| `graphics-icon/imagemin` | imagemin engine: `optimizeImages` · `defaultOptions` · `runCli` + types | no |
+| `graphics-icon/colorfont` | colorfont engine: `build` · `buildAndWrite` · `colorfonts` · `runCli` + types | no |
+| `graphics-icon/svg` | svg engine: `svgIcons` · `runCli` + types | no |
+| `graphics-icon/bitmap` | bitmap engine: `bitmapIcons` · `runCli` + types | no |
+| `graphics-icon/imagemin` | imagemin engine: `imagemin` · `defaultOptions` · `runCli` + types | no |
+| `graphics-icon/unused` | unused-file engine: `removeUnused` · `findUnused` · `runCli` + types | no |
 
-Plus 4 CLI bins: **`g-colorfont`** · **`g-svg`** · **`g-bitmap`** · **`g-min`**.
+Plus 5 CLI bins: **`color-fonts`** · **`svg-icons`** · **`bitmap-icons`** · **`image-min`** · **`remove-unused`**.
 
 ```bash
 pnpm add -D graphics-icon
@@ -36,7 +37,7 @@ import graphicsIcon from 'graphics-icon/vite'
 export default defineConfig({
   plugins: [
     graphicsIcon({
-      colorfont: {
+      colorfonts: {
         colorFormat: 'auto',                  // common (merged into each item)
         items: [{ input: 'src/icons/color', outDir: 'src/fonts', fontName: 'AppIcons' }],
       },
@@ -65,7 +66,7 @@ import { icons, type IconName } from './fonts/AppIcons'  // typed API
 
 ---
 
-## colorfont options
+## colorfonts options
 
 `items[]` of font builds; `colorFormat: 'auto'` emits a coexisting `@font-face` fallback chain (mono + COLRv0 + OT-SVG) so each browser picks the best it supports.
 
@@ -157,33 +158,59 @@ Build-time image optimization (sharp + svgo, hash cache + rename detection). `Im
 
 ---
 
+## unused options
+
+Finds **files nothing references** and writes a manifest table; deletion is a **separate** step (`removeUnused` / `remove-unused`) so a stray detection never deletes by surprise. **Not asset-only** — `ext`/`include` accept any extension/glob (`.js`/`.ts`/`.json`/…); the image/font list is just the default. Two detection backends, same table:
+
+- **Module-graph** (precise): the umbrella option key `unused?: UnusedDetectOptions | false` (build-only plugin, `apply:'build'`, never deletes). Best for code, since reachability = the Rollup graph. Used through the umbrella, the four engines' inputs and outputs (colorfonts/svgIcons/bitmapIcons items' `input`/`inputDir`/`output`/`outDir`) are **auto-excluded** so icon sources are never flagged or deleted.
+- **Static scan** (no Vite): `findUnused()` / `remove-unused --scan` — greps source files for references; for CLI/non-bundler flows. Conservative (over-keeps); entry code files (`main.ts`, HTML/config-referenced) may be false-flagged, so prefer the module-graph backend for code or `exclude` the entries.
+
+`UnusedDetectOptions` (module-graph) / `FindUnusedOptions` (static, adds `sources`/`sourceRoot`):
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `root` | `string` | `'src'` | Scan root. |
+| `include` | `string[]` | derived from `ext` | Candidate globs (relative to `root`). Any extension. |
+| `ext` | `string[]` | image/font/media exts | Builds the default `include` when `include` is omitted. |
+| `exclude` | `string[]` | `[]` | Repo-root-relative globs; **additive** on top of the auto excludes. |
+| `output` | `string` | `.cache.graphics/unused.json` | Manifest table path. |
+| `enabled` | `boolean` | `true` | Skip detection when false. |
+
+Deletion (`removeUnused` / `remove-unused`) takes its own `include`/`exclude` glob filter — a final safety gate independent of how the table was produced (`exclude` always wins; matches reported as `skipped`).
+
+---
+
 ## Standalone (no Vite)
 
 Import each engine from its subpath:
 
 ```ts
-import { build, buildAndWrite, generateColorfonts } from 'graphics-icon/colorfont'
-import { generateSvgSprites } from 'graphics-icon/svg'
-import { generateBitmapSheets } from 'graphics-icon/bitmap'
-import { optimizeImages, defaultOptions } from 'graphics-icon/imagemin'
+import { build, buildAndWrite, colorfonts } from 'graphics-icon/colorfont'
+import { svgIcons } from 'graphics-icon/svg'
+import { bitmapIcons } from 'graphics-icon/bitmap'
+import { imagemin, defaultOptions } from 'graphics-icon/imagemin'
 
-await generateColorfonts({ colorFormat: 'auto', items: [{ input: 'icons', outDir: 'fonts', fontName: 'AppIcons', cacheFilename: 'cf.json' }] })
-await generateSvgSprites({ items: [{ input: 'svg', output: { svg: 'out/icons.svg' } }] })
-await generateBitmapSheets({ items: [{ inputDir: 'png', output: { image: 'out/sheet.webp', style: 'out/sheet.css' } }] })
-await optimizeImages(files, { ...defaultOptions })
+await colorfonts({ colorFormat: 'auto', items: [{ input: 'icons', outDir: 'fonts', fontName: 'AppIcons', cacheFilename: 'cf.json' }] })
+await svgIcons({ items: [{ input: 'svg', output: { svg: 'out/icons.svg' } }] })
+await bitmapIcons({ items: [{ inputDir: 'png', output: { image: 'out/sheet.webp', style: 'out/sheet.css' } }] })
+await imagemin(files, { ...defaultOptions })
 ```
 
-- colorfont: `build(item)` → `BuildResult` (pure, no disk); `buildAndWrite(item)` → writes to `outDir`, returns `BuildResult | null` (`null` = cache hit); `generateColorfonts({items})` → batch.
-- svg/bitmap: `generateSvgSprites`/`generateBitmapSheets({items})`.
-- imagemin: `optimizeImages(files, opts)` + `defaultOptions`.
+- colorfont: `build(item)` → `BuildResult` (pure, no disk); `buildAndWrite(item)` → writes to `outDir`, returns `BuildResult | null` (`null` = cache hit); `colorfonts({items})` → batch.
+- svg/bitmap: `svgIcons`/`bitmapIcons({items})`.
+- imagemin: `imagemin(files, opts)` + `defaultOptions`.
+- unused: `findUnused({ root, include?, ext?, exclude?, sources? })` → static detect (no Vite), writes the table; `removeUnused({ include?, exclude?, dryRun? })` → delete from the table.
 
 ## CLI
 
 ```bash
-g-colorfont build --input icons --out fonts --name AppIcons   # also: watch / check
-g-svg      --config ./svg.config.ts      # default-exports { items: [...] }
-g-bitmap   --config ./bitmap.config.ts   # default-exports { items: [...] }
-g-min      --all --config ./imagemin.config.ts   # or pass a file list (pre-commit)
+color-fonts build --input icons --out fonts --name AppIcons   # also: watch / check
+svg-icons    --config ./svg.config.ts      # default-exports { items: [...] }
+bitmap-icons --config ./bitmap.config.ts   # default-exports { items: [...] }
+image-min    --all --config ./imagemin.config.ts   # or pass a file list (pre-commit)
+remove-unused --scan --root src --exclude "src/icons/**"  # static detect (no vite) -> write table; --ext .js,.ts for any type
+remove-unused --dry-run                            # preview deletion from the table
+remove-unused --exclude "src/keep/**"              # delete, honoring the include/exclude safety gate (--manifest <path> for a custom table)
 ```
 
 ## License
@@ -205,12 +232,13 @@ MIT
 | 导入 | 得到 | 需要 Vite？ |
 | --- | --- | --- |
 | `graphics-icon/vite` | 伞 **Vite 插件** `graphicsIcon`（默认导出），合一四能力 | 是（peer） |
-| `graphics-icon/colorfont` | colorfont 引擎：`build`/`buildAndWrite`/`generateColorfonts`/`runCli` + 类型 | 否 |
-| `graphics-icon/svg` | svg 引擎：`generateSvgSprites`/`runCli` + 类型 | 否 |
-| `graphics-icon/bitmap` | bitmap 引擎：`generateBitmapSheets`/`runCli` + 类型 | 否 |
-| `graphics-icon/imagemin` | imagemin 引擎：`optimizeImages`/`defaultOptions`/`runCli` + 类型 | 否 |
+| `graphics-icon/colorfont` | colorfont 引擎：`build`/`buildAndWrite`/`colorfonts`/`runCli` + 类型 | 否 |
+| `graphics-icon/svg` | svg 引擎：`svgIcons`/`runCli` + 类型 | 否 |
+| `graphics-icon/bitmap` | bitmap 引擎：`bitmapIcons`/`runCli` + 类型 | 否 |
+| `graphics-icon/imagemin` | imagemin 引擎：`imagemin`/`defaultOptions`/`runCli` + 类型 | 否 |
+| `graphics-icon/unused` | 无用文件引擎：`removeUnused`/`findUnused`/`runCli` + 类型 | 否 |
 
-另含 4 个 CLI：**`g-colorfont`** · **`g-svg`** · **`g-bitmap`** · **`g-min`**。
+另含 5 个 CLI：**`color-fonts`** · **`svg-icons`** · **`bitmap-icons`** · **`image-min`** · **`remove-unused`**。
 
 ```bash
 pnpm add -D graphics-icon
@@ -229,7 +257,7 @@ import graphicsIcon from 'graphics-icon/vite'
 export default defineConfig({
   plugins: [
     graphicsIcon({
-      colorfont: {
+      colorfonts: {
         colorFormat: 'auto',                  // 公共参数（合并进每个 item）
         items: [{ input: 'src/icons/color', outDir: 'src/fonts', fontName: 'AppIcons' }],
       },
@@ -263,28 +291,37 @@ import { icons, type IconName } from './fonts/AppIcons'  // 类型化 API
 - **svgIcons**：`item` 必填 `input`/`output.svg`；`color`/`normalize`/`formatter` 等可公共。
 - **bitmapIcons**：`item` 必填 `inputDir`/`output.image`/`output.style`；`padding`/`prefix`/`png`/`webp` 等可公共。
 - **imagemin**：单例，`enabled` + 各格式 sharp 参数 + `svg`(svgo) + `svgSize`；⚠ 就地改写源文件（仅更小才写），母版放 `exclude`。
+- **unused**：找出**无人引用的文件**并写清单表,删除是独立步骤(`removeUnused`/`remove-unused`)。**不限资产** —— `ext`/`include` 接受任意后缀/glob(`.js`/`.ts`/`.json`…),图片/字体清单只是默认值。两种检测后端、同一份表:
+  - **模块图(精确)**:伞选项键 `unused?: UnusedDetectOptions | false`(`apply:'build'` 仅构建期,**只写表不删**);对代码尤其可靠(可达性=模块图)。经伞插件使用时,四引擎的输入/输出(colorfonts/svgIcons/bitmapIcons 的 `input`/`inputDir`/`output`/`outDir`)**自动排除**。
+  - **静态扫描(不依赖 vite)**:`findUnused()` / `remove-unused --scan` —— grep 源码引用,供 CLI/非 bundler 流水线;保守(宁留不误删),入口代码文件可能误报,代码场景优先用模块图后端或 `exclude` 排除入口。
+  - 字段:`root`(默认 `'src'`)、`include`(候选 glob,省略则由 `ext` 生成)、`ext`(默认图片/字体/媒体后缀)、`exclude`(仓库根相对 glob,叠加在自动排除之上)、`output`(默认 `.cache.graphics/unused.json`)、`enabled`(默认 true);`findUnused` 另有 `sources`/`sourceRoot`。
+  - 删除端 `removeUnused`/`remove-unused` 另有独立的 `include`/`exclude` 安全闸(与产表方式无关,`exclude` 优先级最高,命中者记入 `skipped`)。
 
 ## 独立使用（Vite 之外）
 
 ```ts
-import { build, buildAndWrite, generateColorfonts } from 'graphics-icon/colorfont'
-import { generateSvgSprites } from 'graphics-icon/svg'
-import { generateBitmapSheets } from 'graphics-icon/bitmap'
-import { optimizeImages, defaultOptions } from 'graphics-icon/imagemin'
+import { build, buildAndWrite, colorfonts } from 'graphics-icon/colorfont'
+import { svgIcons } from 'graphics-icon/svg'
+import { bitmapIcons } from 'graphics-icon/bitmap'
+import { imagemin, defaultOptions } from 'graphics-icon/imagemin'
 
-await generateColorfonts({ colorFormat: 'auto', items: [{ input: 'icons', outDir: 'fonts', fontName: 'AppIcons', cacheFilename: 'cf.json' }] })
-await optimizeImages(files, { ...defaultOptions })
+await colorfonts({ colorFormat: 'auto', items: [{ input: 'icons', outDir: 'fonts', fontName: 'AppIcons', cacheFilename: 'cf.json' }] })
+await imagemin(files, { ...defaultOptions })
 ```
 
-colorfont：`build(item)` 纯函数（不落盘）；`buildAndWrite(item)` 落盘，返回 `BuildResult | null`（`null`=命中）；`generateColorfonts({items})` 批量。
+colorfont：`build(item)` 纯函数（不落盘）；`buildAndWrite(item)` 落盘，返回 `BuildResult | null`（`null`=命中）；`colorfonts({items})` 批量。
+unused：`findUnused({ root, include?, ext?, exclude?, sources? })` 静态检测(不依赖 vite)写表；`removeUnused({ include?, exclude?, dryRun? })` 按表删除。
 
 ## CLI
 
 ```bash
-g-colorfont build --input icons --out fonts --name AppIcons   # 另有 watch / check
-g-svg      --config ./svg.config.ts      # 配置 default-export { items: [...] }
-g-bitmap   --config ./bitmap.config.ts   # 配置 default-export { items: [...] }
-g-min      --all --config ./imagemin.config.ts   # 或传文件列表(pre-commit)
+color-fonts build --input icons --out fonts --name AppIcons   # 另有 watch / check
+svg-icons    --config ./svg.config.ts      # 配置 default-export { items: [...] }
+bitmap-icons --config ./bitmap.config.ts   # 配置 default-export { items: [...] }
+image-min    --all --config ./imagemin.config.ts   # 或传文件列表(pre-commit)
+remove-unused --scan --root src --exclude "src/icons/**"  # 静态检测(不依赖 vite)→ 写表;--ext .js,.ts 任意后缀
+remove-unused --dry-run                            # 预览按清单的删除
+remove-unused --exclude "src/keep/**"              # 删除,遵守 include/exclude 安全闸(--manifest <path> 指定清单)
 ```
 
 ## License

@@ -21,9 +21,9 @@ description: >-
 (`graphics-icon/colorfont` 等)与 CLI bin,**不**经本私有包。
 - **colorfont**:SVG 图标 → 彩色 webfont(mono/COLRv0/OT-SVG/COLRv1)。引擎 `@codejoo/colorfont`;插件壳
   `src/colorfont-plugin.ts`。**实物落盘**(见下)。
-- **bitmap-icons**:位图 → 单张雪碧图集 + 样式 + 入口脚本。引擎 `generateBitmapSheets`;插件工厂 `bitmapIcons(opts): Plugin`。
-- **svg-icons**:SVG 雪碧图(`<symbol>`+`<use href>`)。引擎 `generateSvgSprites`;插件工厂 `svgIcons(opts): Plugin[]`。
-- **imagemin**:图片压缩(sharp + svgo,哈希缓存)。引擎 `optimizeImages`;Vite 插件形态 `imageminPlugin`。
+- **bitmap-icons**:位图 → 单张雪碧图集 + 样式 + 入口脚本。引擎 `bitmapIcons`;插件工厂 `bitmapIconsVite(opts): Plugin`。
+- **svg-icons**:SVG 雪碧图(`<symbol>`+`<use href>`)。引擎 `svgIcons`;插件工厂 `svgIconsVite(opts): Plugin[]`。
+- **imagemin**:图片压缩(sharp + svgo,哈希缓存)。引擎 `imagemin`;Vite 插件形态 `imageminVite`。
 
 ## 单插件合并(核心:`graphicsIcon` 返回**单个** Plugin)
 `graphicsIcon(options): Plugin`(**不是 Plugin[]**)。内部按子键实例化各子插件(svg 工厂返回数组,会被展开),
@@ -46,10 +46,11 @@ import { icons, type IconName } from './fonts/AppIcons'  // 类型化 API
 `emitDemo`/gallery 选项已移除。
 
 ## 统一选项 `GraphicsIconOptions`
-- `colorfont?: ColorfontOptions | false`
+- `colorfonts?: ColorfontOptions | false`
 - `bitmapIcons?: BitmapIconsOptions | false`
 - `svgIcons?: SvgIconsOptions | false`
 - `imagemin?: ImageminPluginOptions | false`(`= Partial<ImageminOptions> & { enabled? }`,**单例**)
+- `unused?: UnusedDetectOptions | false`(构建期经模块图检测无用文件,写 `.cache.graphics/unused.json`,**只写表不删**;自动排除四引擎输入/输出。**不限资产**——`ext`/`include` 任意后缀。删除是独立的 `removeUnused`/`remove-unused`,带 `include`/`exclude` 安全闸;不走 vite 时用 `findUnused`/`remove-unused --scan` 静态检测)
 
 **多实例**:`colorfont`/`svgIcons`/`bitmapIcons` 均为 `{ ...公共, items: [item, …] }`——公共参数合并进每个 item
 (item 覆盖公共),每个 item = 一套独立缓存 + 独立产物。`imagemin` 为单例。
@@ -67,7 +68,7 @@ import { icons, type IconName } from './fonts/AppIcons'  // 类型化 API
 
 ## 易踩的点
 - `graphicsIcon` 返回**单个** Plugin:`plugins: [graphicsIcon({...})]`,别 `...` 展开(展开非可迭代对象会炸)。
-- `svgIcons(opts)` 工厂仍返回 **Plugin[]**,但这是**内部**用法;对外只经 `graphicsIcon({ svgIcons })`。
+- `svgIconsVite(opts)` 工厂仍返回 **Plugin[]**,但这是**内部**用法;对外只经 `graphicsIcon({ svgIcons })`。
 - colorfont 插件选项类型叫 `ColorfontOptions`(在本包 `colorfont-plugin.ts`),引擎同名类型在 import 处别名为
   `ColorfontEngineOptions`;别再用旧名 `VitePluginColorfontOptions`。
 - **发布相关在 `packages/exports`**:子路径出口、4 个 CLI bin、tsup `entry`/`dts.resolve`、`scripts/copy-wasm.mjs`
