@@ -1,6 +1,6 @@
 {
   "name": "graphics-icon",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "type": "module",
   "license": "MIT",
   "description": "Icon/image build toolkit: color icon webfont + bitmap sprite sheets + SVG symbol sprites + imagemin. Vite plugin (graphics-icon/vite) + standalone engines/CLI per subpath (graphics-icon/bitmap, /svg, /imagemin, /colorfont), with per-instance caching and on-demand loading.",
