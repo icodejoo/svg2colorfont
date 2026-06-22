@@ -6,6 +6,11 @@
  * 用法 / Usage：
  *   <bin> --config ./svg.config.ts        # 配置文件需 default-export 一个 SvgIconsOptions（含 items[]）
  *
+ * 每个 item 的 output 为 `{ dir, name, ts? }`，三产物恒产：
+ *   {dir}/{name}.svg（雪碧图）、{dir}/{name}.{ts?ts:js}（脚本）、{dir}/{name}.json（清单）。
+ * 例 / e.g.：
+ *   export default { items: [{ sources: 'src/icons', output: { dir: 'src/sprites', name: 'icons' }, color: true }] }
+ *
  * 只「按配置生成 + 维护缓存」，不碰 git。/ Only generate + maintain cache; never touches git.
  */
 

@@ -9,17 +9,19 @@ import type { ColorfontItem, ColorFormat, FontFormat } from '../index.ts'
 const USAGE = `colorfont — SVG 图标 → 彩色 webfont
 
 用法:
-  colorfont build  --input <dir,...> --out <dir> --name <fontName> [选项]
+  colorfont build  --sources <dir,...> --dir <dir> --font-name <fontName> --name <base> [选项]
   colorfont watch  ...同 build,监听图标目录变更增量重建
   colorfont check  ...同 build,校验码位锁文件是否漂移(CI 用,漂移则退出码 1)
 
 选项:
-  --input <dir,...>     图标源目录(逗号分隔多个)         必填
-  --out <dir>           产物输出目录                      必填
-  --name <fontName>     字体名 / @font-face family         必填
+  --sources <dir,...>   图标源目录(逗号分隔多个)         必填
+  --dir <dir>           产物输出目录                      必填
+  --font-name <name>    CSS 字体名 / @font-face family     必填
+  --name <base>         产物基名(<base>.<flavor>.<fmt> / <base>.css / <base>.ts)  必填
   --format <a,b>        容器格式: woff2,woff,ttf(默认 woff2)
   --color <mode>        auto|mono|colrv0|otsvg|colrv1(默认 auto)
-  --codepoints <file>   码位锁文件(默认 <out>/codepoints.json)
+  --ts                  产 .ts 脚本入口(默认)
+  --js                  产 .js 脚本入口(无 TS 类型)
   --config <file>       从 JS/TS 配置文件加载选项(default 导出)
   -h, --help            显示帮助
 `
@@ -59,26 +61,35 @@ async function optionsFromFlags(flags: Flags): Promise<ColorfontItem> {
     const mod = await import(pathToFileURL(resolve(config)).href)
     base = (mod.default ?? mod) as Partial<ColorfontItem>
   }
-  const input = str(flags.input)
+  const sources = str(flags.sources)
+  const baseOut = base.output ?? ({} as Partial<ColorfontItem['output']>)
+  // 旗标优先:--dir/--font-name/--name 覆盖 config 的 output.*;未给则沿用 config。
+  const output: ColorfontItem['output'] = {
+    dir: str(flags.dir) ?? (baseOut.dir as string),
+    fontName: str(flags['font-name']) ?? (baseOut.fontName as string),
+    name: str(flags.name) ?? (baseOut.name as string),
+  }
+  // --ts / --js 显式切换脚本语言;都不给则沿用 config(默认 .ts)。
+  if (flags.js === true) output.ts = false
+  else if (flags.ts === true) output.ts = true
+  else if (baseOut.ts !== undefined) output.ts = baseOut.ts
   const merged: ColorfontItem = {
     ...base,
-    input: input ? input.split(',') : (base.input as ColorfontItem['input']),
-    outDir: str(flags.out) ?? (base.outDir as string),
-    fontName: str(flags.name) ?? (base.fontName as string),
+    sources: sources ? sources.split(',') : (base.sources as ColorfontItem['sources']),
+    output,
   }
   const fmt = str(flags.format)
   if (fmt) merged.formats = fmt.split(',') as FontFormat[]
   const color = str(flags.color)
   if (color) merged.colorFormat = color as ColorFormat
-  const cp = str(flags.codepoints)
-  if (cp) merged.codepointsFile = cp
   return merged
 }
 
 function requireOpts(o: ColorfontItem): string | null {
-  if (!o.input) return '缺少 --input'
-  if (!o.outDir) return '缺少 --out'
-  if (!o.fontName) return '缺少 --name'
+  if (!o.sources) return '缺少 --sources'
+  if (!o.output?.dir) return '缺少 --dir'
+  if (!o.output?.fontName) return '缺少 --font-name'
+  if (!o.output?.name) return '缺少 --name'
   return null
 }
 
@@ -132,8 +143,9 @@ export async function run(argv: string[], log: Log = console.log): Promise<numbe
   }
 
   if (cmd === 'check') {
-    const cpFile = options.codepointsFile ?? resolve(options.outDir, `${options.fontName}.codepoints.json`)
-    const before = await readMaybe(resolve(cpFile))
+    // 码位锁路径固定派生 = <dir>/<name>.codepoints.json(与 resolveOptions 一致)。
+    const cpFile = resolve(options.output.dir, `${options.output.name}.codepoints.json`)
+    const before = await readMaybe(cpFile)
     const result = await build(options) // 不落盘
     const after = serializeLockfile(result.codepoints)
     if (before === null) {
@@ -155,7 +167,7 @@ export async function run(argv: string[], log: Log = console.log): Promise<numbe
   const { watch } = await import('node:fs')
   const first = await buildAndWrite(options)
   if (first) summarize('watch 初次构建', first.assets, log)
-  const dirs = Array.isArray(options.input) ? options.input : [options.input]
+  const dirs = Array.isArray(options.sources) ? options.sources : [options.sources]
   let timer: ReturnType<typeof setTimeout> | undefined
   for (const dir of dirs) {
     watch(dir, { recursive: true }, (_ev, file) => {

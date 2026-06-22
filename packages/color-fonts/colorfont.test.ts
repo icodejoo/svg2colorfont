@@ -50,8 +50,8 @@ const opts = (cache = true) => ({
   formats: ["woff2"] as ("woff2" | "woff" | "ttf")[],
   cache,
   items: [
-    { input: fixtures, outDir: "out/a", fontName: "AIcons" },
-    { input: fixtures, outDir: "out/b", fontName: "BIcons", colorFormat: "mono" as const }, // 覆盖公共
+    { sources: fixtures, output: { dir: "out/a", fontName: "AIcons", name: "AIcons" } },
+    { sources: fixtures, output: { dir: "out/b", fontName: "BIcons", name: "BIcons" }, colorFormat: "mono" as const }, // 覆盖公共
   ],
 })
 
@@ -64,6 +64,38 @@ check(existsSync("out/a/AIcons.css") && existsSync("out/a/AIcons.ts"), "A: real 
 check(existsSync("out/a/AIcons.codepoints.json"), "A: codepoints lock written")
 check(existsSync("out/b/BIcons.css") && readdirSync("out/b").some((f) => f.endsWith(".woff2")), "B (mono): products written")
 check(hitCount() === 0, "1st run = miss (both)")
+
+// ───────── 公开元数据清单(恒产):{dir}/{name}.json,与码位锁并存且职责不同 ─────────
+check(existsSync("out/a/AIcons.json"), "manifest: {dir}/{name}.json 产出")
+// 清单与码位锁两文件并存(文件名不同、职责不同:清单=派生产物,锁=提交状态)
+check(existsSync("out/a/AIcons.json") && existsSync("out/a/AIcons.codepoints.json"), "manifest: 清单与码位锁并存(不冲突)")
+const manifest = JSON.parse(readFileSync("out/a/AIcons.json", "utf8")) as {
+  fontName: string
+  unitsPerEm: number
+  glyphs: { name: string; codepoint: number; color: boolean; flavors: string[] }[]
+}
+check(manifest.fontName === "AIcons" && typeof manifest.unitsPerEm === "number", "manifest: 含 fontName + unitsPerEm")
+check(Array.isArray(manifest.glyphs) && manifest.glyphs.length > 0, "manifest: glyphs 为非空数组")
+// 字段齐全:name(string) / codepoint(十进制 int) / color(bool) / flavors(非空 string[])
+check(
+  manifest.glyphs.every(
+    (g) =>
+      typeof g.name === "string" &&
+      Number.isInteger(g.codepoint) &&
+      typeof g.color === "boolean" &&
+      Array.isArray(g.flavors) &&
+      g.flavors.length > 0,
+  ),
+  "manifest: 每个 glyph 字段齐全(name/codepoint/color/flavors)",
+)
+// 清单的图标集合应与本次构建实际产出一致(= fixtures 的图标数,见下方 fxNames)
+// 且清单不含码位锁特有的 present/since 等「状态」字段(纯对外产物)。
+check(
+  manifest.glyphs.every((g) => !("present" in g) && !("since" in g)),
+  "manifest: 不含码位锁的 present/since 状态字段(职责区分)",
+)
+// 清单是纯 JSON,不带 autoGenBanner(JSON 不支持注释)
+check(readFileSync("out/a/AIcons.json", "utf8").trimStart().startsWith("{"), "manifest: 纯 JSON,无注释 banner")
 
 await capture(() => colorfonts(opts()))
 check(hitCount() === 2, "2nd run unchanged = HIT (both instances)")
@@ -119,7 +151,7 @@ const emptyDir = resolve(root, "empty-icons")
 mkdirSync(emptyDir, { recursive: true })
 let emptyThrew = false
 try {
-  await build({ input: [emptyDir], outDir: resolve(root, "out/empty"), fontName: "Empty" })
+  await build({ sources: [emptyDir], output: { dir: resolve(root, "out/empty"), fontName: "Empty", name: "Empty" } })
 } catch {
   emptyThrew = true
 }
@@ -128,7 +160,7 @@ check(emptyThrew, "空输入: build() 默认抛错(走 throwable)")
 // buildAndWrite 同样抛错(经 groupCache.regenerate 向上传播)
 let emptyWriteThrew = false
 try {
-  await buildAndWrite({ input: [emptyDir], outDir: resolve(root, "out/empty"), fontName: "Empty" })
+  await buildAndWrite({ sources: [emptyDir], output: { dir: resolve(root, "out/empty"), fontName: "Empty", name: "Empty" } })
 } catch {
   emptyWriteThrew = true
 }
@@ -142,7 +174,7 @@ console.warn = (...a: unknown[]) => {
   warnLogs.push(a.join(" "))
 }
 try {
-  await colorfonts({ items: [{ input: [emptyDir], outDir: resolve(root, "out/empty"), fontName: "Empty", throwable: false }] })
+  await colorfonts({ items: [{ sources: [emptyDir], output: { dir: resolve(root, "out/empty"), fontName: "Empty", name: "Empty" }, throwable: false }] })
 } catch {
   throwableFalseOk = false
 } finally {
@@ -161,7 +193,7 @@ const iconCount = fxNames.length
 
 let structResult!: Awaited<ReturnType<typeof build>>
 await capture(() =>
-  build({ input: fixtures, outDir: "out/struct", fontName: "Struct", colorFormat: "auto", formats: ["ttf"] }).then(
+  build({ sources: fixtures, output: { dir: "out/struct", fontName: "Struct", name: "Struct" }, colorFormat: "auto", formats: ["ttf"] }).then(
     async (r) => {
       structResult = r
       const { writeFile, mkdir } = await import("node:fs/promises")
@@ -220,10 +252,36 @@ const tsText = readFileSync("out/struct/Struct.ts", "utf8")
 check(cssText.startsWith(autoGenBanner("block")), "banner: css 首部含 block 注释 banner")
 check(tsText.startsWith(autoGenBanner("line")), "banner: ts 首部含 line 注释 banner")
 
+// ───────── 产物命名:字体 = {name}.{flavor}.{format}(flavor 段必须保留,否则多档同名覆盖) ─────────
+const assetNamePat = /^Struct\.(mono|colrv0|otsvg|colrv1)\.(woff2|woff|ttf)$/
+check(
+  structResult.assets.length > 0 && structResult.assets.every((a) => assetNamePat.test(a.fileName)),
+  "naming: 字体文件名为 {name}.{flavor}.{format}",
+)
+// auto 含彩色 → 至少应有 mono + colrv0(不同 flavor 段)→ 文件名彼此不同,不互相覆盖。
+check(
+  new Set(structResult.assets.map((a) => a.fileName)).size === structResult.assets.length,
+  "naming: 多档产物文件名互不相同(flavor 段生效)",
+)
+
+// ───────── ts:false → 产 .js 且内容无任何 TS 类型;ts:true(默认)→ .ts 含 IconName ─────────
+await capture(() =>
+  buildAndWrite({ sources: fixtures, output: { dir: "out/js", fontName: "JsIcons", name: "JsIcons", ts: false }, colorFormat: "auto", formats: ["woff2"] }).then(() => undefined),
+)
+check(existsSync("out/js/JsIcons.js"), "ts:false: 产 .js 脚本入口")
+check(!existsSync("out/js/JsIcons.ts"), "ts:false: 不产 .ts")
+const jsText = readFileSync("out/js/JsIcons.js", "utf8")
+check(!jsText.includes("export type") && !jsText.includes("IconName"), "ts:false: .js 无 export type / IconName(无 TS 类型)")
+check(!jsText.includes("as const satisfies") && !jsText.includes(": string"), "ts:false: .js 无 as const satisfies / 参数类型注解")
+check(jsText.includes("export const codepoints") && jsText.includes("export const icons") && jsText.includes("export const baseName") && jsText.includes("export const colorIcons") && jsText.includes("export function iconContent"), "ts:false: .js 运行时导出齐全")
+check(jsText.startsWith(autoGenBanner("line")), "ts:false: .js 首部仍含 line banner")
+check(existsSync("out/js/JsIcons.codepoints.json"), "ts:false: 码位锁固定派生为 {dir}/{name}.codepoints.json")
+check(tsText.includes("export type IconName") && tsText.includes("as const satisfies"), "ts:true(默认): .ts 含 IconName 联合 + satisfies")
+
 // ───────── configHash 失效:改 woff2Quality 后缓存未命中且 .css 内容随之刷新(防缓存假绿) ─────────
 // 用 buildAndWrite + groupCache,代表产物 .css。改 classPrefix(进 configHash 且改变 css 内容)→ 必 miss 且 css 变。
 const hashDir = "out/hash"
-const baseHashOpts = { input: fixtures, outDir: hashDir, fontName: "HashIcons", colorFormat: "auto" as const, formats: ["woff2"] as ("woff2" | "woff" | "ttf")[] }
+const baseHashOpts = { sources: fixtures, output: { dir: hashDir, fontName: "HashIcons", name: "HashIcons" }, colorFormat: "auto" as const, formats: ["woff2"] as ("woff2" | "woff" | "ttf")[] }
 await capture(() => buildAndWrite({ ...baseHashOpts }).then(() => undefined))
 const cssPath = resolve(hashDir, "HashIcons.css")
 const css1 = readFileSync(cssPath, "utf8")
@@ -266,9 +324,8 @@ check(m3["a"] === cpA && m3["c"] === cpC, "tomb: 加回 b 后 a/c 仍不动")
 // 注:worker 启动失败时引擎 .catch 回退同步 —— 即便回退,本测仍守住「threads:true 配置产物正确且与同步一致」。
 const buildAssetMap = async (threads: boolean): Promise<Record<string, Buffer>> => {
   const r = await build({
-    input: fixtures,
-    outDir: `out/wt-${threads}`,
-    fontName: "WIcons",
+    sources: fixtures,
+    output: { dir: `out/wt-${threads}`, fontName: "WIcons", name: "WIcons" },
     colorFormat: "auto" as const,
     formats: ["woff2", "ttf"] as ("woff2" | "woff" | "ttf")[],
     threads,

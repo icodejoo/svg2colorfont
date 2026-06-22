@@ -4,7 +4,7 @@
  * bitmap-icons CLI — generate bitmap sprite sheets outside Vite (for pre-commit / scripts).
  *
  * 用法 / Usage：
- *   <bin> --config ./bitmap.config.ts      # 配置文件需 default-export 一个 BitmapIconsOptions（含 sprites[]）
+ *   <bin> --config ./bitmap.config.ts      # 配置文件需 default-export 一个 BitmapIconsOptions(含 items[],每项 output: { dir, name, ts?, format? })
  *
  * 只「按配置生成 + 维护缓存」，不碰 git。/ Only generate + maintain cache; never touches git.
  */
@@ -26,7 +26,7 @@ function getConfigArg(argv: string[]): string | undefined {
 export async function runCli(argv: string[] = process.argv.slice(2)): Promise<void> {
   const configPath = getConfigArg(argv)
   if (!configPath) {
-    console.error("[bitmap-icons] 需要 --config <配置文件>（default-export 一个含 sprites[] 的 BitmapIconsOptions）")
+    console.error("[bitmap-icons] 需要 --config <配置文件>(default-export 一个含 items[] 的 BitmapIconsOptions)")
     process.exitCode = 1
     return
   }

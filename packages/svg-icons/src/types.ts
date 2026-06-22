@@ -37,23 +37,30 @@ export type ColorOption = boolean | string | ColorFn | null | undefined
 export type NormalizeOption = boolean | { width?: number } | undefined
 
 /**
- * 产物路径（对齐 bitmap 的 output）：
- *   · svg     —— 输出雪碧图 svg
- *   · script  —— 可选入口脚本 .ts/.js
- * Output paths:
- *   · svg     — emitted sprite svg
- *   · script  — optional entry script .ts/.js
+ * 产物输出（与 colorfont 的 output 统一为 `{ dir, name, ts? }`）。
+ * 三类产物全部恒产，路径由 dir + name 派生：
+ *   · 雪碧图：`{dir}/{name}.svg`
+ *   · 脚本：  `{dir}/{name}.{ts ? 'ts' : 'js'}`（ts 默认 true）
+ *   · 清单：  `{dir}/{name}.json`（机器可读的 symbol id 列表）
+ * Output (unified with colorfont's `{ dir, name, ts? }`). All three products are always emitted,
+ * with paths derived from dir + name:
+ *   · sprite:   `{dir}/{name}.svg`
+ *   · script:   `{dir}/{name}.{ts ? 'ts' : 'js'}` (ts defaults to true)
+ *   · manifest: `{dir}/{name}.json` (machine-readable symbol-id list)
  */
 export interface SvgIconsOutput {
-  /** 输出雪碧图 svg，如 'src/sprites/svg/common/common.sprites.svg' */
-  svg: string
+  /** 产物输出目录，如 'src/sprites/svg/common'。 / Output directory. */
+  dir: string
+  /** 产物基名（不含扩展名），雪碧图/脚本/清单共用。 / Base name (no ext), shared by all products. */
+  name: string
   /**
-   * 可选入口脚本 .ts/.js。生成内容：?url 导入 svg + 导出 iconsName 枚举对象；
-   * .ts 再导出 IconName 字符串字面量联合类型。falsy/省略 → 不生成。
-   * Optional entry script. Emits a ?url import of the svg + iconsName enum object;
-   * .ts also emits the IconName string-literal union. falsy/omitted → not generated.
+   * 脚本是否产 TypeScript（默认 true）：
+   *   · true  → `{name}.ts`，附带 `export type IconName` 字符串字面量联合（供代码提示）。
+   *   · false → `{name}.js`，仅运行时对象（iconsHref + iconsName），无类型。
+   * Emit a TypeScript script (default true): true → `{name}.ts` with the `IconName` union;
+   * false → `{name}.js` with the runtime objects only (no types).
    */
-  script?: string
+  ts?: boolean
 }
 
 /**
@@ -80,9 +87,13 @@ export interface SvgIconsCommon {
 
 /** 单实例配置（公共参数 + 本实例专属）。 / One instance config (common + instance-only fields). */
 export interface SvgIconsItem extends SvgIconsCommon {
-  /** 图标源目录 / icon source directory */
-  input: string
-  /** 产物路径集合（svg 必填，script 可选） / output paths (svg required, script optional) */
+  /**
+   * 图标源目录:单个目录字符串,或多个目录的数组（数组中所有目录的 svg 合进同一张 sprite）。
+   * Icon source directory(ies): a single directory string, or an array of directories
+   * (all svgs across the array are merged into the same sprite).
+   */
+  sources: string | string[]
+  /** 产物输出 `{ dir, name, ts? }`（三产物恒产，路径由 dir+name 派生） / output `{ dir, name, ts? }` (all products always emitted) */
   output: SvgIconsOutput
   /**
    * 独立(CLI/函数)模式的缓存文件:完整路径或裸名（裸名 → 落共享目录 .cache.graphics/）。

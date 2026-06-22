@@ -1,15 +1,16 @@
 /**
  * vite-plugin-bitmap-icons —— 库出口。
  *
- * 用 sharp + maxrects-packer 把 inputDir 下的位图打成一张图集(*.sprite.webp),并生成:
- * 样式(基类 + 每图自适应类)、入口脚本(相对 import 图与样式 + 导出坐标/类型)、可选 JSON。
- * 数组形式可生成多张图集。
+ * 用 sharp + maxrects-packer 把 sources(单个或多个源目录)下的位图打成一张图集,并生成四类**恒产**产物
+ * (路径全由 output: { dir, name, ts?, format? } 派生):图集 `{dir}/{name}.{format}`(format 默认 webp)、
+ * 样式 `{dir}/{name}.css`、入口脚本 `{dir}/{name}.{ts?ts:js}`、坐标 JSON `{dir}/{name}.json`。
+ * items 数组可生成多张图集。
  *
  * 无 publicPath:CSS 用「style→image 相对 url()」、script 用相对 import,均交 Vite 解析/带 hash。
  * 产物用 *.sprite.{webp,png} 命名 → 自动排除出源扫描(故可与源图同目录)。
  *
- * 调用方只需:import { iconsImage, type IconName } from "<output.script 路径>" —— 该脚本注入样式、
- * 给出图 URL 与 IconName 类型,无需关心图/样式文件在哪。
+ * 调用方只需:import { iconsImage, type IconName } from "<output 派生的脚本路径>" —— 该脚本注入样式、
+ * 给出图 URL;.ts 入口额外给出 IconName 类型,无需关心图/样式文件在哪。
  *
  * vite-plugin-bitmap-icons — library entry. Pack bitmaps into a single atlas (sharp + maxrects-packer),
  * emitting a stylesheet, an entry script (relative imports + coords/type) and optional JSON.

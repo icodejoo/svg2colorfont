@@ -11,25 +11,25 @@
 import type { PngOptions, WebpOptions } from "./sharp-types.ts"
 
 /**
- * 产物路径(均相对仓库根,可置于 src/ 下由 Vite 打包)。扩展名决定格式:
- *   image .webp/.png(默认 webp);style .css/.scss(内容相同);script .ts/.js。
+ * 输出配置:目录 + 基名 + 脚本语言 + 图集格式。四类产物全部恒产,路径全由 dir/name 派生:
+ *   图集 `{dir}/{name}.{format}`(format 默认 webp);样式 `{dir}/{name}.css`(只产 css,无 scss);
+ *   脚本 `{dir}/{name}.{ts?ts:js}`(默认 .ts);坐标 JSON `{dir}/{name}.json`。
  * 不再有 publicPath:CSS 用「style→image 的相对 url()」,script 用相对 import,均交 Vite 解析。
  *
- * Output paths (all relative to the repo root, may live under src/ for Vite to bundle).
- * The extension decides the format: image .webp/.png (webp default); style .css/.scss; script .ts/.js.
- * No publicPath — CSS uses a relative url() (style → image), script uses relative imports; Vite resolves both.
+ * Output config: dir + base name + script language + atlas format. All four products are always
+ * emitted, with every path derived from dir/name: image `{dir}/{name}.{format}` (format default webp),
+ * style `{dir}/{name}.css` (css only, no scss), script `{dir}/{name}.{ts?ts:js}` (default .ts),
+ * JSON `{dir}/{name}.json`. No publicPath — relative url()/import resolved by Vite.
  */
 export interface BitmapIconsOutput {
-  /** 图集图片路径,如 "src/sprites/common.sprite.webp"。扩展名须为 .webp 或 .png。 */
-  image: string
-  /** 样式文件路径,如 "src/sprites/common.sprite.css"。其 url() 用到 image 的相对路径。 */
-  style: string
-  /** 可选:入口脚本,如 "src/sprites/common.sprite.ts"(或 .js)。相对 import style 与 image,
-   *  并导出 iconsImage(图 URL)/iconsName;.ts 额外产 IconName 类型。
-   *  调用方只需 import 这个脚本,无需关心 image/style 在哪。 */
-  script?: string
-  /** 可选:坐标 JSON(供 canvas/运行时),如 "src/sprites/common.sprite.json"。 */
-  json?: string
+  /** 产物输出目录(图集 + .css + 脚本入口 + 坐标 JSON 均落盘于此)。 / Output dir for all products. */
+  dir: string
+  /** 产物基名。派生图集 `{dir}/{name}.{format}`、样式 `{dir}/{name}.css`、脚本 `{dir}/{name}.{ts?ts:js}`、JSON `{dir}/{name}.json`。 / Base name driving all product file names. */
+  name: string
+  /** 产 .ts 入口(默认 true);false → 产等价 .js(运行时导出相同,无任何 TS 类型)。 / Emit .ts (default) or .js. */
+  ts?: boolean
+  /** 图集图片格式,'webp' | 'png'(默认 'webp')。 / Atlas image format, 'webp' | 'png' (default 'webp'). */
+  format?: "webp" | "png"
 }
 
 /**
@@ -56,7 +56,7 @@ export interface BitmapIconsCommon {
   prefix?: string
   /** 由源文件「基础名(无扩展名)」生成精灵名。默认原样。名字须匹配 /^[a-zA-Z_][\w-]*$/。 */
   nameTransformer?: (basename: string) => string
-  /** 纳入的图片 glob(相对 inputDir)。默认 ["**\/*.{png,jpg,jpeg,webp,avif}"]。 */
+  /** 纳入的图片 glob(相对每个源目录)。默认 ["**\/*.{png,jpg,jpeg,webp,avif}"]。 */
   include?: string | string[]
   /** 排除的 glob(优先级高于 include)。默认 []。 */
   exclude?: string | string[]
@@ -68,12 +68,17 @@ export interface BitmapIconsCommon {
 
 /** 单组位图雪碧图配置(公共参数 + 本实例专属)。 / One sprite-sheet config (common + instance-only). */
 export interface BitmapIconsItem extends BitmapIconsCommon {
-  /** 源图目录(相对仓库根)。约定:产物命名 *.sprite.{webp,png} 会被自动排除出源扫描。 */
-  inputDir: string
-  /** 产物路径集合(image/style 必填,script/json 可选)。 */
+  /**
+   * 源图目录(相对仓库根),单个或多个;多个源目录会全部枚举后合并打进同一张雪碧图。
+   * 约定:产物命名 *.sprite.{webp,png} 会被自动排除出源扫描。重名校验跨所有源目录生效。
+   * Source dir(s) (relative to repo root); one or many. Multiple dirs are all enumerated
+   * and merged into a single sheet. *.sprite.{webp,png} products are auto-excluded; dup-name check spans all dirs.
+   */
+  sources: string | string[]
+  /** 输出配置:目录 / 基名 / 脚本语言 / 图集格式。 / Output config. */
   output: BitmapIconsOutput
   /**
-   * 独立(CLI/函数)模式的缓存文件:完整路径或裸名。省略 → 由 output.image 派生唯一默认名。
+   * 独立(CLI/函数)模式的缓存文件:完整路径或裸名。省略 → 由 output.name 派生唯一默认名。
    * vite 插件模式请用 `cacheName`(仅名字,目录由系统管理)。
    */
   cacheFilename?: string

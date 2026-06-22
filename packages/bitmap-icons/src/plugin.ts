@@ -9,7 +9,7 @@
 
 import { isAbsolute, relative, resolve } from "node:path"
 
-import { bitmapIcons } from "./generate-sheet.ts"
+import { bitmapIcons, derivePaths } from "./generate-sheet.ts"
 
 import type { BitmapIconsItem, BitmapIconsOptions } from "./types.ts"
 import type { Plugin } from "vite"
@@ -22,11 +22,18 @@ function resolveItems(o: BitmapIconsOptions): BitmapIconsItem[] {
 
 export function bitmapIconsVite(options: BitmapIconsOptions): Plugin {
   const items = resolveItems(options)
-  const roots = items.map((c) => resolve(c.inputDir))
+  // 每个 item 的 sources(string|string[])展开成多个 root;watch 判定覆盖所有 root。
+  // Expand each item's sources (string|string[]) into roots; watch matching covers all roots.
+  const roots = items.flatMap((c) => (Array.isArray(c.sources) ? c.sources : [c.sources]).filter((d) => d !== "").map((d) => resolve(d)))
   // 各组自身产物的绝对路径:写它们不应触发重生成(产物可与源同目录,否则自激发循环)。
-  const ownOutputs = new Set(items.flatMap((c) => [c.output.image, c.output.style, c.output.script, c.output.json].filter((p): p is string => Boolean(p)).map((p) => resolve(p))))
+  const ownOutputs = new Set(
+    items.flatMap((c) => {
+      const { imagePath, stylePath, scriptPath, jsonPath } = derivePaths(c)
+      return [imagePath, stylePath, scriptPath, jsonPath].map((p) => resolve(p))
+    }),
+  )
 
-  // 仅当变更文件落在某 inputDir 内(且非自身产物)才重生成。
+  // 仅当变更文件落在某源目录内(且非自身产物)才重生成。
   const affects = (file: string): boolean => {
     const f = resolve(file)
     if (ownOutputs.has(f)) return false

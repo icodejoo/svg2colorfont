@@ -61,7 +61,7 @@ export function emitCss(
   resolveUrl: (asset: FontAsset) => string,
 ): string {
   const byColor = groupByColor(assets)
-  const ff = q(o.fontFamily)
+  const ff = q(o.fontName)
   /** 一条 src 项:url + format(+ tech) + 行尾浏览器注释。 */
   const entry = (a: FontAsset, tech: string | null, note: string) =>
     `url(${q(resolveUrl(a))}) format(${q(cssFormat(a.format))})${tech ? ` tech(${tech})` : ''} /* ${note} */`

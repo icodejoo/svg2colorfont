@@ -4,22 +4,25 @@
  *      复用 colorfont 的 normalizeSvg（同一套缩放 + 整数化策略）。默认关闭。
  *   2. id 作用域化（修 issue #38，见 scope-ids.ts）
  *   3. 颜色改写（color 选项）
- *   4. 自产 script 入口文件（功能对齐 bitmap）：
+ *   4. 自产 script 入口文件（恒产，功能对齐 bitmap）：
  *        · ?url 导入输出 svg 并导出 iconsHref
  *        · 导出 iconsName 枚举对象（枚举每个图标名）
- *        · .ts 再导出 IconName 字符串字面量联合类型
+ *        · .ts 再导出 IconName 字符串字面量联合类型（.js 则无类型）
+ *   5. 自产 JSON 清单（恒产）：纯数据 `{ sprite, icons }`（symbol id 列表，机器可读，无 banner）。
  *
  * Post-processing of the emitted sprite (idempotent):
  *   1. normalize/scale (optional): scale each symbol geometry to a uniform viewBox width,
  *      reusing colorfont's normalizeSvg (same scale+integerize strategy). Off by default.
  *   2. id scoping (fixes issue #38)
  *   3. color rewrite
- *   4. auto-generated script entry (iconsHref + iconsName + IconName)
+ *   4. auto-generated script entry (iconsHref + iconsName + IconName), always emitted
+ *   5. auto-generated JSON manifest `{ sprite, icons }` (machine-readable, no banner), always emitted
  *
  * 仅做文件改写；缓存闸门与钩子编排在 create.ts。
  */
 
 import { readFile, writeFile } from "node:fs/promises"
+import { basename } from "node:path"
 
 import { autoGenBanner } from "@codejoo/utils/banner"
 import { relTo } from "@codejoo/utils/path-rel"
@@ -178,17 +181,29 @@ export function buildScriptFile(scriptFile: string, spriteFile: string, names: s
   return content
 }
 
+/**
+ * JSON 清单内容（纯函数）：机器可读的纯数据，无 banner。
+ *   { "sprite": "{name}.svg", "icons": ["a","b",...] }
+ * sprite 为相对雪碧图文件名（与 json 同目录），icons 为 symbol id 列表。
+ * JSON manifest (pure function): machine-readable data, no banner.
+ */
+export function buildJsonManifest(spriteFile: string, names: string[]): string {
+  return JSON.stringify({ sprite: basename(spriteFile), icons: names }, null, 2) + "\n"
+}
+
 export interface PostTarget {
-  /** 输出 svg 路径 */
+  /** 输出 svg 路径（恒产） / sprite svg path (always emitted) */
   sprite: string
-  /** 入口脚本 .ts/.js 路径；falsy 表示不生成 */
-  script?: string
+  /** 入口脚本 .ts/.js 路径（恒产，扩展名决定是否产类型） / entry script path (always emitted; ext decides types) */
+  script: string
+  /** JSON 清单路径（恒产） / JSON manifest path (always emitted) */
+  json: string
   color?: ColorOption
   /** 归一化 / 缩放策略（默认关闭） */
   normalize?: NormalizeOption
 }
 
-/** 对一组产物做后处理（sprite 改写 + 自产 script）。生成器写出 sprite 后调用。 */
+/** 对一组产物做后处理（sprite 改写 + 自产 script + 自产 json 清单）。生成器写出 sprite 后调用。 */
 export async function runPostProcess(t: PostTarget): Promise<void> {
   let sprite: string
   try {
@@ -209,8 +224,9 @@ export async function runPostProcess(t: PostTarget): Promise<void> {
     sprite = next
   }
 
-  // script：用 sprite 里的 symbol id 自产（幂等：内容未变不写盘，writeTextIfChanged 复用自 @codejoo/utils）
-  if (t.script) {
-    writeTextIfChanged(t.script, buildScriptFile(t.script, t.sprite, extractIconNames(sprite)))
-  }
+  // script + json：用 sprite 里的 symbol id 自产（幂等：内容未变不写盘，writeTextIfChanged 复用自 @codejoo/utils）
+  // script + json are both always emitted from the sprite's symbol ids.
+  const names = extractIconNames(sprite)
+  writeTextIfChanged(t.script, buildScriptFile(t.script, t.sprite, names))
+  writeTextIfChanged(t.json, buildJsonManifest(t.sprite, names))
 }

@@ -1,6 +1,6 @@
 /**
  * 雪碧图边车文件生成:
- *   · 样式(CSS/SCSS):一套类 —— 基类 .${prefix} + 每图 .${prefix}-${name}。
+ *   · 样式(CSS):一套类 —— 基类 .${prefix} + 每图 .${prefix}-${name}。
  *       每图类带「px 默认尺寸 + aspect-ratio + 百分比 background-size/position」:
  *       默认按 px 尺寸显示(项目可经 pxtorem 等转 rem/vw);改元素 width(或 width/height)
  *       即按容器自适应铺满。background-image 用「相对 image 的 url()」,交 Vite 解析。
@@ -100,7 +100,13 @@ export function emitScript(out: string, manifest: IconManifest, ctx: ScriptCtx):
   writeTextIfChanged(out, content)
 }
 
-export function emitJson(out: string, manifest: IconManifest, ctx: ScriptCtx): void {
+interface JsonCtx {
+  imagePath: string
+  sheet: IconSheetMeta
+}
+
+/** 坐标 JSON:{ image(相对路径), width, height, pixelRatio, frames }。纯数据,无 banner。 / Coordinate JSON: pure data, no banner. */
+export function emitJson(out: string, manifest: IconManifest, ctx: JsonCtx): void {
   const image = relTo(out, ctx.imagePath)
   writeTextIfChanged(out, `${JSON.stringify({ image, ...ctx.sheet, frames: manifest }, null, 2)}\n`)
 }

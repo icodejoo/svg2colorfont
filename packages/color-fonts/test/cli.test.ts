@@ -20,7 +20,7 @@ const log = (m: string) => logs.push(m)
 await rm(out, { recursive: true, force: true })
 await rm(missingCpDir, { recursive: true, force: true })
 
-const baseArgs = ['--input', fixtures, '--out', out, '--name', 'CliIcons', '--format', 'woff2,woff', '--color', 'auto']
+const baseArgs = ['--sources', fixtures, '--dir', out, '--font-name', 'CliIcons', '--name', 'CliIcons', '--format', 'woff2,woff', '--color', 'auto']
 
 // 1) help
 {
@@ -49,7 +49,7 @@ const baseArgs = ['--input', fixtures, '--out', out, '--name', 'CliIcons', '--fo
 // 4) check —— 锁文件缺失,应漂移失败(退出码 1)
 {
   const code = await run(
-    ['check', '--input', fixtures, '--out', missingCpDir, '--name', 'CliIcons', '--color', 'auto'],
+    ['check', '--sources', fixtures, '--dir', missingCpDir, '--font-name', 'CliIcons', '--name', 'CliIcons', '--color', 'auto'],
     log,
   )
   assert(code === 1, 'check(锁文件缺失)退出码 1')
@@ -57,8 +57,8 @@ const baseArgs = ['--input', fixtures, '--out', out, '--name', 'CliIcons', '--fo
 
 // 5) 缺必填参数 → 退出码 2
 {
-  const code = await run(['build', '--out', out], log)
-  assert(code === 2, '缺 --input/--name 退出码 2')
+  const code = await run(['build', '--dir', out], log)
+  assert(code === 2, '缺 --sources/--font-name/--name 退出码 2')
 }
 
 // 6) 未知命令 → 退出码 2

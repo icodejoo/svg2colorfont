@@ -8,7 +8,7 @@ import { sha256 } from '@codejoo/utils/hash'
 import { buildFlavors } from './parallel.ts'
 import { assignCodepoints, readLockfile, writeLockfile } from './codepoints/lockfile.ts'
 import { emitCss as emitCssImpl } from './emit/emit-css.ts'
-import { emitDts } from './emit/emit-dts.ts'
+import { emitScript } from './emit/emit-dts.ts'
 import { resolveOptions } from './options.ts'
 import { loadIcons } from './pipeline/load-icons.ts'
 import { prepareIcons } from './pipeline/prepare-icons.ts'
@@ -20,6 +20,7 @@ import type {
   ColorfontItem,
   ColorfontOptions,
   FontFlavor,
+  FontMetadata,
   GlyphMeta,
   ResolvedOptions,
 } from './types.ts'
@@ -27,6 +28,34 @@ import type { GroupInput } from '@codejoo/utils/cache'
 
 function today(): string {
   return new Date().toISOString().slice(0, 10)
+}
+
+/**
+ * 由 build() 的 metadata 派生「公开元数据清单」(恒产 `{dir}/{name}.json`),与 bitmap/svg 的 json 产物对齐。
+ * 这是机器可读、语言无关的对外清单(只列本次构建实际产出的图标),供运行时/工具消费。
+ * 它与 `{dir}/{name}.codepoints.json`(码位锁)**职责不同**:
+ *  - 码位锁是「状态」:提交进仓库的稳定码位源,含墓碑(present 标志)与历史码位,不计入构建缓存键;
+ *  - 本清单是「产物」:本次构建派生、随产物一起幂等落盘,内容随构建结果变化,不应手改、不提交价值低。
+ * 两者文件名不同(`.codepoints.json` vs `.json`),互不冲突。codepoint 用十进制 int。
+ *
+ * Public, machine-readable manifest derived from build() metadata (the durable `{dir}/{name}.json`),
+ * mirroring the bitmap/svg json product. Distinct from the codepoints lock: the lock is committed *state*
+ * (stable codepoint source with tombstones), while this manifest is a build-derived *product*.
+ */
+function buildManifest(metadata: FontMetadata): string {
+  const manifest = {
+    fontName: metadata.fontName,
+    unitsPerEm: metadata.unitsPerEm,
+    // 只列本次构建实际产出的图标(metadata.glyphs);codepoint 十进制 int;flavors = 该图标产出的档位。
+    glyphs: metadata.glyphs.map((g) => ({
+      name: g.name,
+      codepoint: g.codepoint,
+      color: g.color,
+      flavors: g.flavors,
+    })),
+  }
+  // 纯数据,JSON 不支持注释,故**不加** autoGenBanner(与 bitmap 的 json 一致)。
+  return `${JSON.stringify(manifest, null, 2)}\n`
 }
 
 /** 由 colorFormat + 是否存在彩色图标,推导要产出的 flavor 集合(mono 永远产出)。 */
@@ -69,7 +98,7 @@ function resolveFlavors(cf: ColorFormat, anyColor: boolean): { flavors: FontFlav
  */
 export async function build(options: ColorfontItem, preloaded?: Map<string, string>): Promise<BuildResult> {
   const o = resolveOptions(options)
-  const icons = await loadIcons(o.input, preloaded)
+  const icons = await loadIcons(o.sources, preloaded)
 
   // 空输入即视为失败:静默产出空字体几乎总是误配(输入路径错/目录空)。
   // 抛出后经 buildAndWrite→colorfonts runner 的 try/catch 按 throwable 处理(默认抛、false 告警);
@@ -78,8 +107,8 @@ export async function build(options: ColorfontItem, preloaded?: Map<string, stri
   // (wrong path / empty dir). The throw propagates via the runner's throwable handling.
   if (icons.length === 0) {
     throw new Error(
-      `colorfont: 输入目录未找到任何 .svg 图标: ${o.input.join(', ')}\n` +
-        `colorfont: no .svg icons found in input dir(s): ${o.input.join(', ')}`,
+      `colorfont: 输入目录未找到任何 .svg 图标: ${o.sources.join(', ')}\n` +
+        `colorfont: no .svg icons found in source dir(s): ${o.sources.join(', ')}`,
     )
   }
 
@@ -136,12 +165,11 @@ export async function build(options: ColorfontItem, preloaded?: Map<string, stri
 
   const metadata = {
     fontName: o.fontName,
-    fontFamily: o.fontFamily,
     unitsPerEm: o.unitsPerEm,
     glyphs: glyphsMeta,
   }
 
-  const dts = emitDts(metadata, o)
+  const dts = emitScript(metadata, o)
 
   return {
     assets,
@@ -162,7 +190,8 @@ function configHashOf(o: ResolvedOptions): string {
     JSON.stringify({
       v: COLORFONT_CACHE_VERSION,
       fontName: o.fontName,
-      fontFamily: o.fontFamily,
+      name: o.name,
+      ts: o.ts,
       unitsPerEm: o.unitsPerEm,
       ascender: o.ascender,
       descender: o.descender,
@@ -183,9 +212,9 @@ function configHashOf(o: ResolvedOptions): string {
  * 故这里也用非递归 `*.svg`。否则子目录的 svg 会进缓存指纹却不进字体,导致改子目录触发无谓重建、
  * 或指纹与实际构建集合脱节。
  */
-function readSvgInputs(inputs: string[]): GroupInput[] {
+function readSvgInputs(sources: string[]): GroupInput[] {
   const out: GroupInput[] = []
-  for (const dir of inputs) {
+  for (const dir of sources) {
     let rels: string[] = []
     try {
       rels = globSync('*.svg', { cwd: dir })
@@ -211,23 +240,27 @@ function resolveItems(o: ColorfontOptions): ColorfontItem[] {
 }
 
 /**
- * 便捷版(单字体实例):build 后把字体 / CSS / TS 实物落盘 outDir,经 groupCache 缓存。
+ * 便捷版(单字体实例):build 后把字体 / CSS / 脚本入口实物落盘 output.dir,经 groupCache 缓存。
  * 命中(输入+选项未变、产物在盘、代表产物 .css hash 一致)→ 跳过整条管线,返回 null。
  * 未命中 → 重建落盘,返回 BuildResult。码位锁(.codepoints.json)为「状态」非缓存产物,不随 cache:false 删除。
  */
 export async function buildAndWrite(options: ColorfontItem): Promise<BuildResult | null> {
   const o = resolveOptions(options)
-  const cssPath = join(o.outDir, `${o.fontName}.css`)
+  const cssPath = join(o.dir, `${o.name}.css`)
+  const scriptPath = join(o.dir, `${o.name}.${o.ts ? 'ts' : 'js'}`)
+  // 公开元数据清单(恒产):{dir}/{name}.json —— 与 {name}.codepoints.json(码位锁/状态)文件名不同、职责不同。
+  const manifestPath = join(o.dir, `${o.name}.json`)
   let captured: BuildResult | null = null
 
   // 一次读取:既用于缓存指纹,也透传给 build()/loadIcons 复用(避免未命中时二次磁盘读 + 二次 hash)。
-  // Read inputs once: used for the cache fingerprint and passed through to build()/loadIcons on a miss.
-  const inputs = readSvgInputs(o.input)
+  // Read sources once: used for the cache fingerprint and passed through to build()/loadIcons on a miss.
+  const inputs = readSvgInputs(o.sources)
   const preloaded = new Map<string, string>(inputs.map((i) => [resolve(i.path), typeof i.content === 'string' ? i.content : i.content.toString('utf8')]))
 
   const r = await groupCache(
     {
-      cacheFile: resolveCacheFile(`colorfont-${o.fontName}`, options.cacheFilename),
+      // 缓存文件默认按 name 派生(多实例唯一);可被 cacheFilename 覆盖。
+      cacheFile: resolveCacheFile(`colorfont-${o.name}`, options.cacheFilename),
       cache: o.cache,
       configHash: configHashOf(o),
       inputs,
@@ -236,11 +269,13 @@ export async function buildAndWrite(options: ColorfontItem): Promise<BuildResult
     async () => {
       const result = await build(options, preloaded) // 纯构建(无缓存),复用已读 buffer
       captured = result
-      await mkdir(o.outDir, { recursive: true })
+      await mkdir(o.dir, { recursive: true })
       // 产物(字节)交给 groupCache 幂等落盘;码位锁单独写(非缓存产物)。
-      const products: { path: string; content: Buffer | Uint8Array | string }[] = result.assets.map((a) => ({ path: join(o.outDir, a.fileName), content: a.source }))
+      const products: { path: string; content: Buffer | Uint8Array | string }[] = result.assets.map((a) => ({ path: join(o.dir, a.fileName), content: a.source }))
       products.push({ path: cssPath, content: result.emitCss((a) => `./${a.fileName}`) })
-      products.push({ path: join(o.outDir, `${o.fontName}.ts`), content: result.dts })
+      products.push({ path: scriptPath, content: result.dts })
+      // 公开元数据清单(恒产)与 css/脚本同列,交给 groupCache 幂等落盘;纯数据,无 banner。
+      products.push({ path: manifestPath, content: buildManifest(result.metadata) })
       await writeLockfile(o.codepointsFile, result.codepoints)
       return products
     },
@@ -254,12 +289,13 @@ export async function buildAndWrite(options: ColorfontItem): Promise<BuildResult
  */
 export async function colorfonts(options: ColorfontOptions): Promise<void> {
   for (const item of resolveItems(options)) {
+    const label = item.output.name
     try {
       const r = await buildAndWrite(item)
-      if (r === null) console.log(`[colorfont] 命中缓存,跳过:${item.fontName}`)
-      else console.log(`[colorfont] ${item.fontName}: ${r.assets.length} 个产物(${[...new Set(r.assets.map((a) => a.color))].join(', ')})`)
+      if (r === null) console.log(`[colorfont] 命中缓存,跳过:${label}`)
+      else console.log(`[colorfont] ${label}: ${r.assets.length} 个产物(${[...new Set(r.assets.map((a) => a.color))].join(', ')})`)
     } catch (e) {
-      if (item.throwable === false) console.warn(`[colorfont] ${item.fontName} 生成失败:\n${String(e)}`)
+      if (item.throwable === false) console.warn(`[colorfont] ${label} 生成失败:\n${String(e)}`)
       else throw e
     }
   }
@@ -275,6 +311,7 @@ export type {
   ColorfontCommon,
   ColorfontItem,
   ColorfontOptions,
+  ColorfontOutput,
   ColorFormat,
   FontAsset,
   FontFlavor,

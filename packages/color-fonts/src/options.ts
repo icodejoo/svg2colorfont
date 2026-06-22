@@ -6,23 +6,27 @@ const DEFAULT_PA_START = 0xe000
 
 /** 填充默认值,规范化路径(单字体实例)。 */
 export function resolveOptions(o: ColorfontItem): ResolvedOptions {
-  if (!o.input) throw new Error('colorfont: 缺少 input')
-  if (!o.outDir) throw new Error('colorfont: 缺少 outDir')
-  if (!o.fontName) throw new Error('colorfont: 缺少 fontName')
+  if (!o.sources) throw new Error('colorfont: 缺少 sources')
+  if (!o.output?.dir) throw new Error('colorfont: 缺少 output.dir')
+  if (!o.output?.fontName) throw new Error('colorfont: 缺少 output.fontName')
+  if (!o.output?.name) throw new Error('colorfont: 缺少 output.name')
 
   const unitsPerEm = o.unitsPerEm ?? 1000
   const ascender = o.ascender ?? Math.round(unitsPerEm * 0.8)
   const descender = o.descender ?? ascender - unitsPerEm
-  const outDir = resolve(o.outDir)
-  const input = (Array.isArray(o.input) ? o.input : [o.input]).map((p) =>
+  const dir = resolve(o.output.dir)
+  const sources = (Array.isArray(o.sources) ? o.sources : [o.sources]).map((p) =>
     isAbsolute(p) ? p : resolve(p),
   )
+  const name = o.output.name
 
   return {
-    input,
-    outDir,
-    fontName: o.fontName,
-    fontFamily: o.fontFamily ?? o.fontName,
+    sources,
+    dir,
+    fontName: o.output.fontName,
+    name,
+    // 脚本入口默认产 .ts;ts:false 产等价 .js(无任何 TS 类型)。
+    ts: o.output.ts !== false,
     unitsPerEm,
     ascender,
     descender,
@@ -36,8 +40,8 @@ export function resolveOptions(o: ColorfontItem): ResolvedOptions {
     threads: o.threads ?? 'auto',
     // 缓存默认开启(布尔);具体缓存文件 + 命中/复用由 buildAndWrite 的 groupCache 持有。false 关闭。
     cache: o.cache !== false,
-    // 码位锁默认按 fontName 派生(多字体共用 outDir 时不冲突)。建议 commit。
-    codepointsFile: o.codepointsFile ? resolve(o.codepointsFile) : resolve(outDir, `${o.fontName}.codepoints.json`),
+    // 码位锁固定派生 = `<dir>/<name>.codepoints.json`(不可配置;多字体共用 dir 时按 name 唯一)。建议 commit。
+    codepointsFile: resolve(dir, `${name}.codepoints.json`),
     paStart: o.paStart ?? DEFAULT_PA_START,
   }
 }

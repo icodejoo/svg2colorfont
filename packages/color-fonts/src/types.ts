@@ -41,8 +41,6 @@ export interface CodepointMap {
  * Shared "common" params (set at top level; merged into each item, item overrides).
  */
 export interface ColorfontCommon {
-  /** CSS font-family(默认同 fontName)。 */
-  fontFamily?: string
   /** em 方格,默认 1000。 */
   unitsPerEm?: number
   /** 默认按 unitsPerEm 推导:asc = 0.8em, desc = -0.2em。 */
@@ -70,18 +68,35 @@ export interface ColorfontCommon {
   throwable?: boolean
 }
 
+/**
+ * 单字体实例的输出配置。 / Output config for one font instance.
+ */
+export interface ColorfontOutput {
+  /** 产物输出目录(字体 + .css + 脚本入口 + 码位锁实物落盘于此)。 / Output dir. */
+  dir: string
+  /**
+   * CSS 字体名 = @font-face font-family + OpenType name 表 + 字形归属。
+   * The CSS font name: @font-face font-family + OpenType name table + glyph ownership.
+   */
+  fontName: string
+  /**
+   * 产物基名。字体 `{dir}/{name}.{flavor}.{format}`、样式 `{dir}/{name}.css`、
+   * 脚本 `{dir}/{name}.ts`(或 `.js`)、码位锁 `{dir}/{name}.codepoints.json`(固定派生)。
+   * Product base name. Drives font/css/script/codepoints-lock file names.
+   */
+  name: string
+  /** 产 .ts 入口(默认 true);false → 产等价 .js(运行时导出相同,无任何 TS 类型)。 / Emit .ts (default) or .js. */
+  ts?: boolean
+}
+
 /** 单字体实例配置(公共参数 + 本实例专属)。 / One font instance (common + instance-only). */
 export interface ColorfontItem extends ColorfontCommon {
-  /** 图标源目录(.svg)。 */
-  input: string | string[]
-  /** 产物输出目录(字体 + .css + .ts 实物落盘于此)。 */
-  outDir: string
-  /** OpenType family / @font-face font-family。 */
-  fontName: string
-  /** 码位锁文件路径,默认 `<outDir>/<fontName>.codepoints.json`。建议 commit。 */
-  codepointsFile?: string
+  /** 图标源目录(.svg)。 / Icon source dir(s) (.svg). */
+  sources: string | string[]
+  /** 输出配置:目录 / 字体名 / 产物基名 / 脚本语言。 / Output config. */
+  output: ColorfontOutput
   /**
-   * 独立(CLI/函数)模式的缓存文件:完整路径或裸名。省略 → 由 fontName 派生唯一默认名。
+   * 独立(CLI/函数)模式的缓存文件:完整路径或裸名。省略 → 由 output.name 派生唯一默认名。
    * vite 插件模式请用 `cacheName`(仅名字,目录由系统管理)。
    */
   cacheFilename?: string
@@ -95,14 +110,17 @@ export interface ColorfontOptions extends ColorfontCommon {
   items: ColorfontItem[]
 }
 
-/** @deprecated 旧名,等价于单实例 ColorfontItem(过渡用)。 / Old alias for the single ColorfontItem. */
-export type ColorfontEngineOptions = ColorfontItem
-
 export interface ResolvedOptions {
-  input: string[]
-  outDir: string
+  /** 规范化后的源目录绝对路径数组。 / Normalized absolute source dirs. */
+  sources: string[]
+  /** 输出目录(绝对)。 / Output dir (absolute). */
+  dir: string
+  /** CSS 字体名(@font-face font-family + OpenType name + 字形归属)。 / CSS font name. */
   fontName: string
-  fontFamily: string
+  /** 产物基名。 / Product base name. */
+  name: string
+  /** 脚本入口语言:true → .ts,false → .js。 / Script entry language. */
+  ts: boolean
   unitsPerEm: number
   ascender: number
   descender: number
@@ -117,6 +135,7 @@ export interface ResolvedOptions {
   threads: boolean | 'auto'
   /** 是否启用缓存(groupCache 由 buildAndWrite 持有;build 本身为纯函数无缓存)。 */
   cache: boolean
+  /** 码位锁绝对路径,内部派生 = `<dir>/<name>.codepoints.json`(不可配置)。 / Derived codepoints-lock path. */
   codepointsFile: string
   paStart: number
 }
@@ -147,7 +166,6 @@ export interface GlyphMeta {
 
 export interface FontMetadata {
   fontName: string
-  fontFamily: string
   unitsPerEm: number
   glyphs: GlyphMeta[]
 }

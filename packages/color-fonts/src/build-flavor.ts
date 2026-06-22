@@ -24,7 +24,8 @@ async function encodeFont(
   else source = toWoff(ttf)
   const hash = contentHash(source)
   // 文件名不带内容指纹(稳定名,便于引用/缓存复用);hash 仍保留在 asset 上供需要处使用。
-  return { fileName: `${o.fontName}.${color}.${format}`, source, color, format, hash }
+  // flavor 段(color)必须保留,否则多档同名互相覆盖。
+  return { fileName: `${o.name}.${color}.${format}`, source, color, format, hash }
 }
 
 /** 构建某一档的 SFNT(TTF)字节。各写表器直接消费预计算的 PreparedIcon(不再 toOutline)。 */

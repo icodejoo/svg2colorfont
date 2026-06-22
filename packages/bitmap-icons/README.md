@@ -8,7 +8,14 @@
 - **集成进 Vite**：经 `graphicsIcon({ bitmapIcons: {...} })`（完整插件选项见[发布包 README](../exports/README.md#bitmapicons-options)）。
 - **单独使用**：从 `graphics-icon/bitmap` import 引擎函数，或用 CLI（`bitmap-icons`）——见下文。
 
-特点：无 `publicPath`（CSS 用「style→image 相对 url()」、script 用相对 import，均交 Vite 解析/带 hash）；产物 `*.sprite.{webp,png}` 命名会被自动排除出源扫描，故可与源图同目录；每组生成幂等（内容未变不写盘 → 不触发 HMR 循环）。
+特点：
+
+- **统一 output 形状** `{ dir, name, ts?, format? }`，四类产物路径全部派生、**全部恒产**：
+  - 图集 `{dir}/{name}.{format}`（`format?: 'webp' | 'png'`，默认 `'webp'`；只接受这两值）；
+  - 样式 `{dir}/{name}.css`（**只产 CSS，已砍掉 SCSS**）；
+  - 入口脚本 `{dir}/{name}.{ts ? 'ts' : 'js'}`（`ts?: boolean` 默认 `true`；**恒产**）；
+  - 坐标 JSON `{dir}/{name}.json`（**恒产**，不再可选）。
+- 无 `publicPath`（CSS 用「style→image 相对 url()」、script 用相对 import，均交 Vite 解析/带 hash）；产物 `*.sprite.{webp,png}` 命名会被自动排除出源扫描，故可与源图同目录；每组生成幂等（内容未变不写盘 → 不触发 HMR 循环）。
 
 ## 单独使用 / Standalone
 
@@ -22,13 +29,18 @@ import { bitmapIcons } from 'graphics-icon/bitmap'
 await bitmapIcons({
   // 多实例 { ...公共, items: [...] }（公共参数合并进每项）
   items: [
-    { inputDir: 'src/icons/png', prefix: 'icon',
-      output: { image: 'src/sprites/sheet.webp', style: 'src/sprites/sheet.css', script: 'src/sprites/sheet.ts' } },
+    // sources 可传单个目录，或目录数组（多个源目录全部枚举后合并打进同一张雪碧图）
+    // output: { dir, name, ts?, format? } —— 四类产物（图集/css/脚本/json）路径全派生且恒产
+    { sources: 'src/icons/png', prefix: 'icon',
+      output: { dir: 'src/sprites', name: 'sheet' } }, // → sheet.webp / sheet.css / sheet.ts / sheet.json
+    // format:'png' + ts:false 示例（图集产 .png、脚本产 .js）：
+    { sources: ['src/icons/png', 'src/icons/extra'], prefix: 'extra',
+      output: { dir: 'src/sprites', name: 'extra', format: 'png', ts: false } }, // → extra.png / extra.css / extra.js / extra.json
   ],
 })
 ```
 
-调用方只需：`import { iconsImage, type IconName } from '<output.script>'` —— 该脚本注入样式、给出图 URL 与类型。
+调用方只需：`import { iconsImage, type IconName } from '<output 派生的脚本路径>'` —— 该脚本注入样式、给出图 URL；`.ts` 入口额外给出 `IconName` 字符串联合类型（`ts: false` 时产等价 `.js`，无类型）。
 
 ### CLI
 

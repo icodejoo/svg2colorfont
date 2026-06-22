@@ -18,7 +18,7 @@
  *       svgIconsVite({
  *         items: [
  *           {
- *             input: "src/assets/icons",
+ *             sources: "src/assets/icons",   // 单目录;多目录用数组 ["a", "b"]
  *             output: {
  *               svg: "src/sprites/common.sprites.svg",
  *               script: "src/sprites/index.ts",

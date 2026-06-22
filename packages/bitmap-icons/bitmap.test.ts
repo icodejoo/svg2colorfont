@@ -42,18 +42,25 @@ const png = (file: string, r: number, g: number, b: number) => sharp({ create: {
 await png("imgs/home.png", 255, 0, 0)
 await png("imgs/star.png", 0, 255, 0)
 
+// 新 shape:output: { dir, name, ts?, format? };四类产物全部恒产,路径全派生。
 const opts = (cache = true) => ({
   padding: 2,
   prefix: "icon", // 公共参数:合并进 item
   cache,
-  items: [{ inputDir: "imgs", output: { image: "out/sheet.webp", style: "out/sheet.css", script: "out/sheet.ts", json: "out/sheet.json" } }],
+  items: [{ sources: "imgs", output: { dir: "out", name: "sheet" } }], // format 默认 webp、ts 默认 true
 })
 
 await capture(() => bitmapIcons(opts()))
 check(existsSync("out/sheet.webp") && existsSync("out/sheet.css") && existsSync("out/sheet.ts") && existsSync("out/sheet.json"), "all products (webp+css+ts+json) generated")
+// 恒产:json 不再可选,必产。
+check(existsSync("out/sheet.json"), "json always emitted (no longer optional)")
+// format 默认 webp 决定扩展名(非由 image 扩展名)。
+check(existsSync("out/sheet.webp") && !existsSync("out/sheet.png"), "format default webp decides extension")
 // banner 校验:css 首部含 block 注释 banner;ts 入口含 line 注释 banner。
 check(readFileSync("out/sheet.css", "utf8").startsWith(autoGenBanner("block")), "banner: css 首部含 block 注释 banner")
 check(readFileSync("out/sheet.ts", "utf8").includes(autoGenBanner("line").trim()), "banner: ts 含 line 注释 banner")
+// ts:true 默认 → .ts 产 IconName 字符串联合(供代码提示)。
+check(readFileSync("out/sheet.ts", "utf8").includes("export type IconName ="), "ts:true emits IconName union")
 const cacheFile = resolve(root, ".cache.graphics/bitmap-icons-sheet.json")
 check(existsSync(cacheFile), "per-instance cache file written (bitmap-icons-sheet.json)")
 check(!hadHit(), "1st run = miss")
@@ -73,6 +80,37 @@ check(existsSync("out/sheet.css"), "deleted product restored")
 await capture(() => bitmapIcons(opts(false)))
 check(!hadHit(), "cache:false = miss")
 check(existsSync("out/sheet.webp") && existsSync(cacheFile), "cache:false rebuilt products + cache")
+
+// ── 多源目录合并成一张图 ──
+// 两个独立源目录 imgs-a / imgs-b,各放一张图 → 合并打进同一张 sheet,manifest 含两者。
+mkdirSync("imgs-a", { recursive: true })
+mkdirSync("imgs-b", { recursive: true })
+await png("imgs-a/alpha.png", 12, 34, 56)
+await png("imgs-b/beta.png", 78, 90, 120)
+const multiOpts = {
+  padding: 2,
+  prefix: "icon",
+  items: [{ sources: ["imgs-a", "imgs-b"], output: { dir: "out-multi", name: "sheet" } }],
+}
+await capture(() => bitmapIcons(multiOpts))
+check(existsSync("out-multi/sheet.webp") && existsSync("out-multi/sheet.json"), "multi-source: products generated")
+const multiManifest = JSON.parse(readFileSync("out-multi/sheet.json", "utf8")) as { frames: Record<string, unknown> }
+const multiNames = Object.keys(multiManifest.frames)
+check(multiNames.includes("alpha") && multiNames.includes("beta"), "multi-source: both dirs merged into one sheet")
+
+// ── format: 'png' + ts: false ──
+// format:png → 图集扩展名为 .png(非 .webp);ts:false → 产 .js 且无 export type。
+const pngJsOpts = {
+  prefix: "icon",
+  items: [{ sources: "imgs-a", output: { dir: "out-pngjs", name: "sheet", format: "png" as const, ts: false } }],
+}
+await capture(() => bitmapIcons(pngJsOpts))
+check(existsSync("out-pngjs/sheet.png") && !existsSync("out-pngjs/sheet.webp"), "format:png decides .png extension")
+check(existsSync("out-pngjs/sheet.js") && !existsSync("out-pngjs/sheet.ts"), "ts:false emits .js (not .ts)")
+check(existsSync("out-pngjs/sheet.css") && existsSync("out-pngjs/sheet.json"), "format:png + ts:false: css & json still always emitted")
+const jsSrc = readFileSync("out-pngjs/sheet.js", "utf8")
+check(!jsSrc.includes("export type"), "ts:false .js has no `export type`")
+check(jsSrc.includes("iconsImage") && jsSrc.includes("iconsName"), "ts:false .js still has runtime iconsImage/iconsName")
 
 // ── 空输入 + 清理陈旧产物 ──
 // 捕获 warn,判定是否抛出
